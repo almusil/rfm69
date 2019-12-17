@@ -16,3 +16,8 @@ at your option.
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
+
+### Credits
+
+This library was inspired by older [rfm69 crate](https://github.com/lolzballs/rfm69) from
+[Benjamin Cheng](https://github.com/lolzballs).
