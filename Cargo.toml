@@ -3,7 +3,12 @@ name = "rfm69"
 version = "0.1.0"
 authors = ["Ales Musil <aedvin1@gmail.com>"]
 edition = "2018"
+license = "MIT OR Apache-2.0"
+keywords = ["rfm69", "driver", "hal"]
+categories = ["embedded", "hardware-support"]
+repository = "https://github.com/almusil/rfm69"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+embedded-hal = "0.2"
