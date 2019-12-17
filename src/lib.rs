@@ -405,7 +405,10 @@ where
 
 /// Configures RFM69 according to [LowPowerLab](https://github.com/LowPowerLab/RFM69) Arduino
 /// library
-pub fn low_power_lab_defaults<T, S, D>(mut rfm: Rfm69<T, S, D>) -> Result<Rfm69<T, S, D>>
+pub fn low_power_lab_defaults<T, S, D>(
+    mut rfm: Rfm69<T, S, D>,
+    network_id: u8,
+) -> Result<Rfm69<T, S, D>>
 where
     T: OutputPin,
     S: Transfer<u8>,
@@ -421,7 +424,7 @@ where
     rfm.frequency(434_000_000.0)?;
     rfm.write(Registers::RxBw, 0x42)?;
     rfm.preamble(3)?;
-    rfm.sync(&mut [0x2d, 0x64])?;
+    rfm.sync(&mut [0x2d, network_id])?;
     rfm.packet(PacketConfig {
         format: PacketFormat::Variable(66),
         dc: PacketDc::None,
