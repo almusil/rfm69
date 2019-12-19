@@ -4,6 +4,11 @@
  [![Build Status](https://api.travis-ci.com/almusil/rfm69.svg?branch=master)](https://travis-ci.com//almusil/rfm69)
 
 
+## Examples
+
+All examples are in the [examples](https://github.com/almusil/rfm69/tree/master/examples) directory and were tested
+using RPI 4 + RFM69W. 
+
 ## License
 
 Licensed under either of
