@@ -408,6 +408,7 @@ where
 pub fn low_power_lab_defaults<T, S, D>(
     mut rfm: Rfm69<T, S, D>,
     network_id: u8,
+    frequency: f32,
 ) -> Result<Rfm69<T, S, D>>
 where
     T: OutputPin,
@@ -421,7 +422,8 @@ where
         shaping: ModulationShaping::Shaping00,
     })?;
     rfm.bit_rate(55_555.0)?;
-    rfm.frequency(434_000_000.0)?;
+    rfm.frequency(frequency)?;
+    rfm.fdev(50_000.0)?;
     rfm.write(Registers::RxBw, 0x42)?;
     rfm.preamble(3)?;
     rfm.sync(&mut [0x2d, network_id])?;
