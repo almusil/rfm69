@@ -1,5 +1,5 @@
 # rfm69
- A generic rust driver to support RFM69 family wireless chips.
+ A generic `no_std` rust driver to support RFM69 family wireless chips.
  
  [![Build Status](https://api.travis-ci.com/almusil/rfm69.svg?branch=master)](https://travis-ci.com//almusil/rfm69)
 
