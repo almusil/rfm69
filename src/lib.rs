@@ -25,6 +25,12 @@
 //! - [Product page](https://www.hoperf.com/modules/rf_transceiver/RFM69HCW.html)
 //! - [Datasheet](https://www.hoperf.com/data/upload/portal/20190307/RFM69HCW-V1.1.pdf)
 
+#![no_std]
+
+#[cfg(test)]
+#[macro_use]
+extern crate std;
+
 pub mod registers;
 
 use embedded_hal::blocking::delay::DelayMs;
@@ -40,7 +46,7 @@ use registers::{
 const FOSC: f32 = 32_000_000.0;
 const FSTEP: f32 = FOSC / 524_288.0; // FOSC/2^19
 
-type Result<T> = std::result::Result<T, Error>;
+type Result<T> = core::result::Result<T, Error>;
 
 pub struct Error(pub &'static str);
 

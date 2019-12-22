@@ -6,6 +6,8 @@ use embedded_hal::blocking::delay::DelayMs;
 use embedded_hal::blocking::spi::Transfer;
 use embedded_hal::digital::v2::OutputPin;
 
+use std::prelude::v1::*;
+
 struct OutputPinMock;
 
 impl OutputPin for OutputPinMock {
