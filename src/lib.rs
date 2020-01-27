@@ -170,7 +170,7 @@ where
         if len == 0 {
             return self.update(Registers::SyncConfig, |r| r & 0x7f);
         } else if len > 8 {
-            return Err(Error("Too big sync size"));
+            Err(Error("Too big sync size"))?;
         }
         let reg = 0x80 | ((len - 1) as u8) << 3;
         self.write(Registers::SyncConfig, reg)?;
@@ -271,6 +271,11 @@ where
         self.mode(Mode::Standby)
     }
 
+    /// Check if IRQ flag PacketReady is set.
+    pub fn is_packet_ready(&mut self) -> Result<bool> {
+        Ok(self.read(Registers::IrqFlags2)? & 0x04 != 0)
+    }
+
     fn dio(&mut self) -> Result<()> {
         let mut reg = 0x07;
         for opt_mapping in self.dio.iter() {
@@ -294,10 +299,6 @@ where
         })
     }
 
-    fn is_packet_ready(&mut self) -> Result<bool> {
-        Ok(self.read(Registers::IrqFlags2)? & 0x04 != 0)
-    }
-
     fn wait_packet_sent(&mut self) -> Result<()> {
         self.with_timeout(100, 5, |rfm| {
             Ok((rfm.read(Registers::IrqFlags2)? & 0x08) != 0)
@@ -316,7 +317,7 @@ where
             done = func(self)?;
         }
         if !done {
-            return Err(Error("Timeout"));
+            Err(Error("Timeout"))?;
         }
         Ok(())
     }
