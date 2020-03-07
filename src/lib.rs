@@ -48,6 +48,7 @@ const FSTEP: f32 = FOSC / 524_288.0; // FOSC/2^19
 
 type Result<T> = core::result::Result<T, Error>;
 
+#[derive(Debug)]
 pub struct Error(pub &'static str);
 
 /// Main struct to interact with RFM69 chip.
