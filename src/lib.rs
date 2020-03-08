@@ -73,15 +73,21 @@ where
     D: DelayMs<u8>,
 {
     /// Creates a new instance with everything set to default values after restart.
-    pub fn new(spi: S, cs: T, delay: D) -> Self {
-        Rfm69 {
+    pub fn new(spi: S, cs: T, delay: D) -> Result<Self> {
+        let mut rfm = Rfm69 {
             spi,
             cs,
             delay,
             mode: Mode::Standby,
             dio: [None; 6],
             rssi: 0.0,
-        }
+        };
+		let ver = rfm.get_version()?;
+		if ver == 0x24 {
+			Ok(rfm)
+		} else {
+			Err(Error("Unexpected version number! Is everything wired correctly?"))
+		}
     }
 
     /// Reads content of all registers that are available.
@@ -360,6 +366,9 @@ where
         self.spi.transfer(buffer).map_err(map_spi_err::<S>)?;
         Ok(())
     }
+	pub fn get_version(&mut self) -> Result<u8> {
+		self.read(Registers::Version)
+	}
 }
 
 struct CsGuard<'a, T>
