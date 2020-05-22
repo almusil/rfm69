@@ -228,3 +228,185 @@ pub enum FifoMode {
     NotEmpty,
     Level(u8),
 }
+
+pub struct LnaConfig {
+    pub zin: LnaImpedance,
+    pub gain_select: LnaGain,
+}
+
+pub enum LnaImpedance {
+    Ohm50 = 0x00,
+    Ohm200 = 0x80,
+}
+
+pub enum LnaGain {
+    AgcLoop = 0b000,
+    G1 = 0b001,
+    G2 = 0b010,
+    G3 = 0b011,
+    G4 = 0b100,
+    G5 = 0b101,
+    G6 = 0b110,
+}
+
+pub enum SensitivityBoost {
+    Normal = 0x1B,
+    HighSensitivity = 0x2D,
+}
+
+pub enum Pa13dBm1 {
+    Normal = 0x55,
+    High20dBm = 0x5D,
+}
+
+pub enum Pa13dBm2 {
+    Normal = 0x70,
+    High20dBm = 0x7C,
+}
+
+pub enum ContinuousDagc {
+    Normal = 0x00,
+    ImprovedMarginAfcLowBetaOn1 = 0x20,
+    ImprovedMarginAfcLowBetaOn0 = 0x30,
+}
+
+pub struct RxBw<T>
+where
+    T: RxBwFreq,
+{
+    pub dcc_cutoff: DccCutoff,
+    pub rx_bw: T,
+}
+
+pub enum DccCutoff {
+    Percent16 = 0x00,
+    Percent8 = 0x20,
+    Percent4 = 0x40,
+    Percent2 = 0x60,
+    Percent1 = 0x80,
+    Percent0dot5 = 0xA0,
+    Percent0dot25 = 0xC0,
+    Percent0dot125 = 0xE0,
+}
+
+pub trait RxBwFreq {
+    fn value(&self) -> u8;
+}
+
+pub enum RxBwFsk {
+    Khz2dot6,
+    Khz3dot1,
+    Khz3dot9,
+    Khz5dot2,
+    Khz6dot3,
+    Khz7dot8,
+    Khz10dot4,
+    Khz12dot5,
+    Khz15dot6,
+    Khz20dot8,
+    Khz25dot0,
+    Khz31dot3,
+    Khz41dot7,
+    Khz50dot0,
+    Khz62dot5,
+    Khz83dot3,
+    Khz100dot0,
+    Khz125dot0,
+    Khz166dot7,
+    Khz200dot0,
+    Khz250dot0,
+    Khz333dot3,
+    Khz400dot0,
+    Khz500dot0,
+}
+
+impl RxBwFreq for RxBwFsk {
+    #[inline]
+    fn value(&self) -> u8 {
+        match self {
+            RxBwFsk::Khz2dot6 => 0b10 << 3 | 7,
+            RxBwFsk::Khz3dot1 => 0b01 << 3 | 7,
+            RxBwFsk::Khz3dot9 => 7,
+            RxBwFsk::Khz5dot2 => 0b10 << 3 | 6,
+            RxBwFsk::Khz6dot3 => 0b01 << 3 | 6,
+            RxBwFsk::Khz7dot8 => 6,
+            RxBwFsk::Khz10dot4 => 0b10 << 3 | 5,
+            RxBwFsk::Khz12dot5 => 0b01 << 3 | 5,
+            RxBwFsk::Khz15dot6 => 5,
+            RxBwFsk::Khz20dot8 => 0b10 << 3 | 4,
+            RxBwFsk::Khz25dot0 => 0b01 << 3 | 4,
+            RxBwFsk::Khz31dot3 => 4,
+            RxBwFsk::Khz41dot7 => 0b10 << 3 | 3,
+            RxBwFsk::Khz50dot0 => 0b01 << 3 | 3,
+            RxBwFsk::Khz62dot5 => 3,
+            RxBwFsk::Khz83dot3 => 0b10 << 3 | 2,
+            RxBwFsk::Khz100dot0 => 0b01 << 3 | 2,
+            RxBwFsk::Khz125dot0 => 2,
+            RxBwFsk::Khz166dot7 => 0b10 << 3 | 1,
+            RxBwFsk::Khz200dot0 => 0b01 << 3 | 1,
+            RxBwFsk::Khz250dot0 => 1,
+            RxBwFsk::Khz333dot3 => 0b10 << 3,
+            RxBwFsk::Khz400dot0 => 0b01 << 3,
+            RxBwFsk::Khz500dot0 => 0,
+        }
+    }
+}
+
+pub enum RxBwOok {
+    Khz1dot3,
+    Khz1dot6,
+    Khz2dot0,
+    Khz2dot6,
+    Khz3dot1,
+    Khz3dot9,
+    Khz5dot2,
+    Khz6dot3,
+    Khz7dot8,
+    Khz10dot4,
+    Khz12dot5,
+    Khz15dot6,
+    Khz20dot8,
+    Khz25dot0,
+    Khz31dot3,
+    Khz41dot7,
+    Khz50dot0,
+    Khz62dot5,
+    Khz83dot3,
+    Khz100dot0,
+    Khz125dot0,
+    Khz166dot7,
+    Khz200dot0,
+    Khz250dot0,
+}
+
+impl RxBwFreq for RxBwOok {
+    #[inline]
+    fn value(&self) -> u8 {
+        match self {
+            RxBwOok::Khz1dot3 => 0b10 << 3 | 7,
+            RxBwOok::Khz1dot6 => 0b01 << 3 | 7,
+            RxBwOok::Khz2dot0 => 7,
+            RxBwOok::Khz2dot6 => 0b10 << 3 | 6,
+            RxBwOok::Khz3dot1 => 0b01 << 3 | 6,
+            RxBwOok::Khz3dot9 => 6,
+            RxBwOok::Khz5dot2 => 0b10 << 3 | 5,
+            RxBwOok::Khz6dot3 => 0b01 << 3 | 5,
+            RxBwOok::Khz7dot8 => 5,
+            RxBwOok::Khz10dot4 => 0b10 << 3 | 4,
+            RxBwOok::Khz12dot5 => 0b01 << 3 | 4,
+            RxBwOok::Khz15dot6 => 4,
+            RxBwOok::Khz20dot8 => 0b10 << 3 | 3,
+            RxBwOok::Khz25dot0 => 0b01 << 3 | 3,
+            RxBwOok::Khz31dot3 => 3,
+            RxBwOok::Khz41dot7 => 0b10 << 3 | 2,
+            RxBwOok::Khz50dot0 => 0b01 << 3 | 2,
+            RxBwOok::Khz62dot5 => 2,
+            RxBwOok::Khz83dot3 => 0b10 << 3 | 1,
+            RxBwOok::Khz100dot0 => 0b01 << 3 | 1,
+            RxBwOok::Khz125dot0 => 1,
+            RxBwOok::Khz166dot7 => 0b10 << 3,
+            RxBwOok::Khz200dot0 => 0b01 << 3,
+            RxBwOok::Khz250dot0 => 0,
+        }
+    }
+}
