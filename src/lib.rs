@@ -31,18 +31,20 @@
 #[macro_use]
 extern crate std;
 
-pub mod registers;
-
 use embedded_hal::blocking::delay::DelayMs;
 use embedded_hal::blocking::spi::Transfer;
 use embedded_hal::digital::v2::OutputPin;
 
 use core::marker::PhantomData;
-use registers::{
-    DataMode, DioMapping, DioPin, FifoMode, InterPacketRxDelay, Mode, Modulation,
-    ModulationShaping, ModulationType, PacketConfig, PacketDc, PacketFiltering, PacketFormat,
-    Registers,
+
+use crate::registers::{
+    ContinuousDagc, DataMode, DccCutoff, DioMapping, DioPin, FifoMode, InterPacketRxDelay,
+    LnaConfig, LnaGain, LnaImpedance, Mode, Modulation, ModulationShaping, ModulationType,
+    Pa13dBm1, Pa13dBm2, PacketConfig, PacketDc, PacketFiltering, PacketFormat, Registers, RxBw,
+    RxBwFreq, RxBwFsk, SensitivityBoost,
 };
+
+pub mod registers;
 
 const FOSC: f32 = 32_000_000.0;
 const FSTEP: f32 = FOSC / 524_288.0; // FOSC/2^19
@@ -284,6 +286,59 @@ where
         Ok(self.read(Registers::IrqFlags2)? & 0x04 != 0)
     }
 
+    /// Configure LNA in corresponding register `RegLna (0x18)`.
+    pub fn lna(&mut self, lna: LnaConfig) -> Result<(), Ecs, Espi> {
+        let reg = (lna.zin as u8) | (lna.gain_select as u8);
+        self.update(Registers::Lna, |r| (r & 0x78) | reg)
+    }
+
+    /// Configure RSSI Threshold in corresponding register `RegRssiThresh (0x29)`.
+    pub fn rssi_threshold(&mut self, threshold: u8) -> Result<(), Ecs, Espi> {
+        self.write(Registers::RssiThresh, threshold)
+    }
+
+    /// Configure Sensitivity Boost in corresponding register `RegTestLna (0x58)`.
+    pub fn sensitivity_boost(&mut self, boost: SensitivityBoost) -> Result<(), Ecs, Espi> {
+        self.write(Registers::TestLna, boost as u8)
+    }
+
+    /// Configure Pa13 dBm 1 in corresponding register `RegTestPa1 (0x5A)`.
+    pub fn pa13_dbm1(&mut self, pa13: Pa13dBm1) -> Result<(), Ecs, Espi> {
+        self.write(Registers::TestPa1, pa13 as u8)
+    }
+
+    /// Configure Pa13 dBm 2 in corresponding register `RegTestPa2 (0x5C)`.
+    pub fn pa13_dbm2(&mut self, pa13: Pa13dBm2) -> Result<(), Ecs, Espi> {
+        self.write(Registers::TestPa2, pa13 as u8)
+    }
+
+    /// Configure Continuous Dagc in corresponding register `RegTestDagc (0x6F)`.
+    pub fn continuous_dagc(&mut self, cdagc: ContinuousDagc) -> Result<(), Ecs, Espi> {
+        self.write(Registers::TestDagc, cdagc as u8)
+    }
+
+    /// Configure Rx Bandwidth in corresponding register `RegRxBw (0x19)`.
+    pub fn rx_bw<RxBwT>(&mut self, rx_bw: RxBw<RxBwT>) -> Result<(), Ecs, Espi>
+    where
+        RxBwT: RxBwFreq,
+    {
+        self.write(
+            Registers::RxBw,
+            rx_bw.dcc_cutoff as u8 | rx_bw.rx_bw.value(),
+        )
+    }
+
+    /// Configure Rx AFC Bandwidth in corresponding register `RegAfcBw (0x1A)`.
+    pub fn rx_afc_bw<RxBwT>(&mut self, rx_bw: RxBw<RxBwT>) -> Result<(), Ecs, Espi>
+    where
+        RxBwT: RxBwFreq,
+    {
+        self.write(
+            Registers::AfcBw,
+            rx_bw.dcc_cutoff as u8 | rx_bw.rx_bw.value(),
+        )
+    }
+
     fn dio(&mut self) -> Result<(), Ecs, Espi> {
         let mut reg = 0x07;
         for opt_mapping in self.dio.iter() {
@@ -425,6 +480,10 @@ where
     rfm.bit_rate(55_555.0)?;
     rfm.frequency(frequency)?;
     rfm.fdev(50_000.0)?;
+    rfm.rx_bw(RxBw {
+        dcc_cutoff: DccCutoff::Percent4,
+        rx_bw: RxBwFsk::Khz125dot0,
+    })?;
     rfm.write(Registers::RxBw, 0x42)?;
     rfm.preamble(3)?;
     rfm.sync(&mut [0x2d, network_id])?;
@@ -437,6 +496,12 @@ where
         auto_rx_restart: true,
     })?;
     rfm.fifo_mode(FifoMode::NotEmpty)?;
+    rfm.lna(LnaConfig {
+        zin: LnaImpedance::Ohm50,
+        gain_select: LnaGain::AgcLoop,
+    })?;
+    rfm.rssi_threshold(220)?;
+    rfm.continuous_dagc(ContinuousDagc::ImprovedMarginAfcLowBetaOn0)?;
     Ok(rfm)
 }
 
