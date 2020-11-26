@@ -484,7 +484,6 @@ where
         dcc_cutoff: DccCutoff::Percent4,
         rx_bw: RxBwFsk::Khz125dot0,
     })?;
-    rfm.write(Registers::RxBw, 0x42)?;
     rfm.preamble(3)?;
     rfm.sync(&mut [0x2d, network_id])?;
     rfm.packet(PacketConfig {
