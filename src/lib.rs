@@ -180,7 +180,7 @@ where
         if len == 0 {
             return self.update(Registers::SyncConfig, |r| r & 0x7f);
         } else if len > 8 {
-            Err(Error::SyncSize)?;
+            return Err(Error::SyncSize);
         }
         let reg = 0x80 | ((len - 1) as u8) << 3;
         self.write(Registers::SyncConfig, reg)?;
@@ -380,7 +380,7 @@ where
             done = func(self)?;
         }
         if !done {
-            Err(Error::Timeout)?;
+            return Err(Error::Timeout);
         }
         Ok(())
     }
