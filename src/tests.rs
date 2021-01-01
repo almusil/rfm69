@@ -3,7 +3,7 @@
 use crate::registers::*;
 use crate::*;
 use embedded_hal::blocking::delay::DelayMs;
-use embedded_hal::blocking::spi::Transfer;
+use embedded_hal::blocking::spi::{Transfer, Write};
 use embedded_hal::digital::v2::OutputPin;
 
 use std::prelude::v1::*;
@@ -36,6 +36,15 @@ impl Transfer<u8> for SpiMock {
             *val = self.tx_buffer[index];
         }
         Ok(words)
+    }
+}
+
+impl Write<u8> for SpiMock {
+    type Error = ();
+
+    fn write(&mut self, words: &[u8]) -> std::result::Result<(), Self::Error> {
+        self.rx_buffer.extend_from_slice(words);
+        Ok(())
     }
 }
 
