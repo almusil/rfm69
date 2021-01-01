@@ -34,7 +34,7 @@ fn main() {
     // Prepare struct for the data
     let packet = Packet::new(10, 1, Vec::from(b"Hello, world!".as_ref()), false, true);
     println!("{:?}", packet);
-    rfm.send(&mut packet.as_bytes()).ok().unwrap();
+    rfm.send(&packet.as_bytes()).ok().unwrap();
 
     // Wait for ACK to arrive
     let mut buffer = [0; 64];
