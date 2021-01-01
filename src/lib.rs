@@ -32,7 +32,7 @@
 extern crate std;
 
 use embedded_hal::blocking::delay::DelayMs;
-use embedded_hal::blocking::spi::Transfer;
+use embedded_hal::blocking::spi::{Transfer, Write};
 use embedded_hal::digital::v2::OutputPin;
 
 use core::marker::PhantomData;
@@ -79,6 +79,7 @@ impl<T, S, D, Ecs, Espi> Rfm69<T, S, D>
 where
     T: OutputPin<Error = Ecs>,
     S: Transfer<u8, Error = Espi>,
+    S: Write<u8, Error = Espi>,
     D: DelayMs<u8>,
 {
     /// Creates a new instance with everything set to default values after restart.
@@ -117,24 +118,24 @@ where
     /// `RegBitrateMsb (0x03), RegBitrateLsb (0x04)`.
     pub fn bit_rate(&mut self, bit_rate: f32) -> Result<(), Ecs, Espi> {
         let reg = (FOSC / bit_rate) as u16;
-        let mut val = reg.to_be_bytes();
-        self.write_many(Registers::BitrateMsb, &mut val)
+        let val = reg.to_be_bytes();
+        self.write_many(Registers::BitrateMsb, &val)
     }
 
     /// Computes the frequency deviation, according to `fdev / Fstep` and stores it in
     /// `RegFdevMsb (0x05), RegFdevLsb (0x06)`.
     pub fn fdev(&mut self, fdev: f32) -> Result<(), Ecs, Espi> {
         let reg = (fdev / FSTEP) as u16;
-        let mut val = reg.to_be_bytes();
-        self.write_many(Registers::FdevMsb, &mut val)
+        let val = reg.to_be_bytes();
+        self.write_many(Registers::FdevMsb, &val)
     }
 
     /// Computes the radio frequency, according to `frequency / Fstep` and stores it in
     /// `RegFrfMsb (0x07), RegFrfMid (0x08), RegFrfLsb (0x09)`.
     pub fn frequency(&mut self, frequency: f32) -> Result<(), Ecs, Espi> {
         let reg = (frequency / FSTEP) as u32;
-        let mut val = reg.to_be_bytes();
-        self.write_many(Registers::FrfMsb, &mut val[1..])
+        let val = reg.to_be_bytes();
+        self.write_many(Registers::FrfMsb, &val[1..])
     }
 
     /// Stores DIO mapping for different RFM69 modes. For DIO behavior between modes
@@ -169,13 +170,13 @@ where
     /// Sets preamble length in corresponding registers `RegPreambleMsb (0x2C),
     /// RegPreambleLsb (0x2D)`.
     pub fn preamble(&mut self, reg: u16) -> Result<(), Ecs, Espi> {
-        let mut val = reg.to_be_bytes();
-        self.write_many(Registers::PreambleMsb, &mut val)
+        let val = reg.to_be_bytes();
+        self.write_many(Registers::PreambleMsb, &val)
     }
 
     /// Sets sync config and sync words in `RegSyncConfig (0x2E), RegSyncValue1-8(0x2F-0x36)`.
     /// Maximal sync length is 8, pass empty buffer to clear the sync flag.
-    pub fn sync(&mut self, sync: &mut [u8]) -> Result<(), Ecs, Espi> {
+    pub fn sync(&mut self, sync: &[u8]) -> Result<(), Ecs, Espi> {
         let len = sync.len();
         if len == 0 {
             return self.update(Registers::SyncConfig, |r| r & 0x7f);
@@ -201,8 +202,8 @@ where
         }
         reg |=
             packet_config.dc as u8 | packet_config.filtering as u8 | (packet_config.crc as u8) << 4;
-        let mut val = [reg, len];
-        self.write_many(Registers::PacketConfig1, &mut val)?;
+        let val = [reg, len];
+        self.write_many(Registers::PacketConfig1, &val)?;
         reg = packet_config.interpacket_rx_delay as u8 | (packet_config.auto_rx_restart as u8) << 1;
         self.update(Registers::PacketConfig2, |r| r & 0x0d | reg)
     }
@@ -228,7 +229,7 @@ where
     /// Sets AES encryption in corresponding registers `RegPacketConfig2 (0x3D),
     /// RegAesKey1-16 (0x3E-0x4D)`. The key must be 16 bytes long, pass empty buffer to disable
     /// the AES encryption.
-    pub fn aes(&mut self, key: &mut [u8]) -> Result<(), Ecs, Espi> {
+    pub fn aes(&mut self, key: &[u8]) -> Result<(), Ecs, Espi> {
         let len = key.len();
         if len == 0 {
             return self.update(Registers::PacketConfig2, |r| r & 0xfe);
@@ -264,7 +265,7 @@ where
     }
 
     /// Send bytes to another RFM69. This can block until all data are send.
-    pub fn send(&mut self, buffer: &mut [u8]) -> Result<(), Ecs, Espi> {
+    pub fn send(&mut self, buffer: &[u8]) -> Result<(), Ecs, Espi> {
         if buffer.is_empty() {
             return Ok(());
         }
@@ -348,8 +349,8 @@ where
                 }
             }
         }
-        let mut val = reg.to_be_bytes();
-        self.write_many(Registers::DioMapping1, &mut val)
+        let val = reg.to_be_bytes();
+        self.write_many(Registers::DioMapping1, &val)
     }
 
     fn reset_fifo(&mut self) -> Result<(), Ecs, Espi> {
@@ -394,14 +395,14 @@ where
     }
 
     fn write(&mut self, reg: Registers, val: u8) -> Result<(), Ecs, Espi> {
-        self.write_many(reg, &mut [val])
+        self.write_many(reg, &[val])
     }
 
-    fn write_many(&mut self, reg: Registers, data: &mut [u8]) -> Result<(), Ecs, Espi> {
+    fn write_many(&mut self, reg: Registers, data: &[u8]) -> Result<(), Ecs, Espi> {
         let mut guard = CsGuard::new(&mut self.cs);
         guard.select()?;
-        self.spi.transfer(&mut [reg.write()]).map_err(Error::Spi)?;
-        self.spi.transfer(data).map_err(Error::Spi)?;
+        self.spi.write(&[reg.write()]).map_err(Error::Spi)?;
+        self.spi.write(data).map_err(Error::Spi)?;
         Ok(())
     }
 
@@ -414,7 +415,7 @@ where
     fn read_many(&mut self, reg: Registers, buffer: &mut [u8]) -> Result<(), Ecs, Espi> {
         let mut guard = CsGuard::new(&mut self.cs);
         guard.select()?;
-        self.spi.transfer(&mut [reg.read()]).map_err(Error::Spi)?;
+        self.spi.write(&[reg.read()]).map_err(Error::Spi)?;
         self.spi.transfer(buffer).map_err(Error::Spi)?;
         Ok(())
     }
@@ -469,6 +470,7 @@ pub fn low_power_lab_defaults<T, S, D, Ecs, Espi>(
 where
     T: OutputPin<Error = Ecs>,
     S: Transfer<u8, Error = Espi>,
+    S: Write<u8, Error = Espi>,
     D: DelayMs<u8>,
 {
     rfm.mode(Mode::Standby)?;
@@ -485,7 +487,7 @@ where
         rx_bw: RxBwFsk::Khz125dot0,
     })?;
     rfm.preamble(3)?;
-    rfm.sync(&mut [0x2d, network_id])?;
+    rfm.sync(&[0x2d, network_id])?;
     rfm.packet(PacketConfig {
         format: PacketFormat::Variable(66),
         dc: PacketDc::None,
