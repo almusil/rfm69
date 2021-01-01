@@ -41,7 +41,7 @@ fn main() {
     if packet.ack_requested() {
         let ack = Packet::new(packet.to, packet.from, Vec::new(), true, false);
         println!("{:?}", ack);
-        rfm.send(&mut ack.as_bytes()).ok().unwrap();
+        rfm.send(&ack.as_bytes()).ok().unwrap();
     }
 
     // Un-export the CS pin

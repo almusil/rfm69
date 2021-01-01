@@ -29,9 +29,9 @@ fn main() {
         println!("Register 0x{:02x} = 0x{:02x}", index + 1, val);
     }
 
-    // Prepare buffer to store the received data
-    let mut buffer = Vec::from(b"Hello, world!".as_ref());
-    rfm.send(&mut buffer).ok().unwrap();
+    // Send a packet
+    let buffer = Vec::from(b"Hello, world!".as_ref());
+    rfm.send(&buffer).ok().unwrap();
 
     // Un-export the CS pin
     Pin::new(25).unexport().unwrap();
