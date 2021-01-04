@@ -118,24 +118,21 @@ where
     /// `RegBitrateMsb (0x03), RegBitrateLsb (0x04)`.
     pub fn bit_rate(&mut self, bit_rate: f32) -> Result<(), Ecs, Espi> {
         let reg = (FOSC / bit_rate) as u16;
-        let val = reg.to_be_bytes();
-        self.write_many(Registers::BitrateMsb, &val)
+        self.write_many(Registers::BitrateMsb, &reg.to_be_bytes())
     }
 
     /// Computes the frequency deviation, according to `fdev / Fstep` and stores it in
     /// `RegFdevMsb (0x05), RegFdevLsb (0x06)`.
     pub fn fdev(&mut self, fdev: f32) -> Result<(), Ecs, Espi> {
         let reg = (fdev / FSTEP) as u16;
-        let val = reg.to_be_bytes();
-        self.write_many(Registers::FdevMsb, &val)
+        self.write_many(Registers::FdevMsb, &reg.to_be_bytes())
     }
 
     /// Computes the radio frequency, according to `frequency / Fstep` and stores it in
     /// `RegFrfMsb (0x07), RegFrfMid (0x08), RegFrfLsb (0x09)`.
     pub fn frequency(&mut self, frequency: f32) -> Result<(), Ecs, Espi> {
         let reg = (frequency / FSTEP) as u32;
-        let val = reg.to_be_bytes();
-        self.write_many(Registers::FrfMsb, &val[1..])
+        self.write_many(Registers::FrfMsb, &reg.to_be_bytes()[1..])
     }
 
     /// Stores DIO mapping for different RFM69 modes. For DIO behavior between modes
@@ -170,8 +167,7 @@ where
     /// Sets preamble length in corresponding registers `RegPreambleMsb (0x2C),
     /// RegPreambleLsb (0x2D)`.
     pub fn preamble(&mut self, reg: u16) -> Result<(), Ecs, Espi> {
-        let val = reg.to_be_bytes();
-        self.write_many(Registers::PreambleMsb, &val)
+        self.write_many(Registers::PreambleMsb, &reg.to_be_bytes())
     }
 
     /// Sets sync config and sync words in `RegSyncConfig (0x2E), RegSyncValue1-8(0x2F-0x36)`.
@@ -202,8 +198,7 @@ where
         }
         reg |=
             packet_config.dc as u8 | packet_config.filtering as u8 | (packet_config.crc as u8) << 4;
-        let val = [reg, len];
-        self.write_many(Registers::PacketConfig1, &val)?;
+        self.write_many(Registers::PacketConfig1, &[reg, len])?;
         reg = packet_config.interpacket_rx_delay as u8 | (packet_config.auto_rx_restart as u8) << 1;
         self.update(Registers::PacketConfig2, |r| r & 0x0d | reg)
     }
@@ -349,8 +344,7 @@ where
                 }
             }
         }
-        let val = reg.to_be_bytes();
-        self.write_many(Registers::DioMapping1, &val)
+        self.write_many(Registers::DioMapping1, &reg.to_be_bytes())
     }
 
     fn reset_fifo(&mut self) -> Result<(), Ecs, Espi> {
