@@ -304,7 +304,7 @@ fn test_preamble() {
 fn test_sync() {
     let mut rfm = setup_rfm(Vec::new(), vec![0b1_0_000_000, 0, 0]);
 
-    rfm.sync(&mut []).ok().unwrap();
+    rfm.sync(&[]).ok().unwrap();
     assert_eq!(
         rfm.spi.rx_buffer[0..=3],
         [
@@ -316,7 +316,7 @@ fn test_sync() {
     );
 
     rfm.spi.rx_buffer.clear();
-    rfm.sync(&mut [0x12, 0x34, 0x56]).ok().unwrap();
+    rfm.sync(&[0x12, 0x34, 0x56]).ok().unwrap();
     assert_eq!(
         rfm.spi.rx_buffer[0..=5],
         [
@@ -329,7 +329,7 @@ fn test_sync() {
         ]
     );
 
-    rfm.sync(&mut [0; 9]).err().unwrap();
+    rfm.sync(&[0; 9]).err().unwrap();
 }
 
 #[test]
@@ -442,7 +442,7 @@ fn test_aes() {
         vec![0b0000000_1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     );
 
-    rfm.aes(&mut []).ok().unwrap();
+    rfm.aes(&[]).ok().unwrap();
     assert_eq!(
         rfm.spi.rx_buffer[0..=3],
         [
@@ -468,8 +468,8 @@ fn test_aes() {
     );
     assert_eq!(rfm.spi.rx_buffer[5..=20], *b"1234567890abcdef");
 
-    rfm.aes(&mut [0; 14]).err().unwrap();
-    rfm.aes(&mut [0; 17]).err().unwrap();
+    rfm.aes(&[0; 14]).err().unwrap();
+    rfm.aes(&[0; 17]).err().unwrap();
 }
 
 #[test]
