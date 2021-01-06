@@ -340,11 +340,29 @@ where
         self.write_many(reg, &[val])
     }
 
+    /// Direct write to RFM69 registers.
+    pub fn write_many(&mut self, reg: Registers, data: &[u8]) -> Result<(), Ecs, Espi> {
+        let mut guard = CsGuard::new(&mut self.cs);
+        guard.select()?;
+        self.spi.write(&[reg.write()]).map_err(Error::Spi)?;
+        self.spi.write(data).map_err(Error::Spi)?;
+        Ok(())
+    }
+
     /// Direct read from RFM69 registers.
     pub fn read(&mut self, reg: Registers) -> Result<u8, Ecs, Espi> {
         let mut buffer = [0u8; 1];
         self.read_many(reg, &mut buffer)?;
         Ok(buffer[0])
+    }
+
+    /// Direct read from RFM69 registers.
+    pub fn read_many(&mut self, reg: Registers, buffer: &mut [u8]) -> Result<(), Ecs, Espi> {
+        let mut guard = CsGuard::new(&mut self.cs);
+        guard.select()?;
+        self.spi.write(&[reg.read()]).map_err(Error::Spi)?;
+        self.spi.transfer(buffer).map_err(Error::Spi)?;
+        Ok(())
     }
 
     fn dio(&mut self) -> Result<(), Ecs, Espi> {
@@ -398,22 +416,6 @@ where
     {
         let val = self.read(reg)?;
         self.write(reg, f(val))
-    }
-
-    fn write_many(&mut self, reg: Registers, data: &[u8]) -> Result<(), Ecs, Espi> {
-        let mut guard = CsGuard::new(&mut self.cs);
-        guard.select()?;
-        self.spi.write(&[reg.write()]).map_err(Error::Spi)?;
-        self.spi.write(data).map_err(Error::Spi)?;
-        Ok(())
-    }
-
-    fn read_many(&mut self, reg: Registers, buffer: &mut [u8]) -> Result<(), Ecs, Espi> {
-        let mut guard = CsGuard::new(&mut self.cs);
-        guard.select()?;
-        self.spi.write(&[reg.read()]).map_err(Error::Spi)?;
-        self.spi.transfer(buffer).map_err(Error::Spi)?;
-        Ok(())
     }
 }
 
