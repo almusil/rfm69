@@ -35,7 +35,7 @@ use embedded_hal::blocking::delay::DelayMs;
 use embedded_hal::blocking::spi::{Transfer, Write};
 use embedded_hal::digital::v2::OutputPin;
 
-use core::{cmp::min, convert::TryInto, marker::PhantomData};
+use core::{convert::TryInto, marker::PhantomData};
 
 use crate::registers::{
     ContinuousDagc, DataMode, DccCutoff, DioMapping, DioPin, FifoMode, InterPacketRxDelay,
@@ -263,27 +263,22 @@ where
     /// bytes available. This can be combined with DIO interrupt for `SyncAddressMatch`, calling
     /// `recv_large` immediately after the interrupt will not block waiting for packets. It will
     /// still block until all data are received.
-    /// This function is designed to receive packets larger than the FIFO size by reading `chunk_size`
-    /// bytes at a time as soon as the `FifoThreshold` IRQ flag is set.
-    /// `CrcAutoClearOff` must be set, and `chunk_size` must not exceed `FifoThreshold + 1`.
-    pub fn recv_large(&mut self, chunk_size: usize, buffer: &mut [u8]) -> Result<usize, Ecs, Espi> {
+    /// This function is designed to receive packets larger than the FIFO size by reading data
+    /// from the FIFO as soon as it is available. This can only be used with Variable(255) packet
+    /// format and node address and CRC filtering disabled.
+    pub fn recv_large(&mut self, buffer: &mut [u8]) -> Result<usize, Ecs, Espi> {
         if buffer.is_empty() {
             return Ok(0);
         }
 
-        self.reset_fifo()?;
-
         self.mode(Mode::Receiver)?;
-        self.wait_mode_ready()?;
-
-        while !self.is_sync_address_match()? {}
 
         while self.is_fifo_empty()? {}
         let len: usize = self.read(Registers::Fifo)?.into();
 
-        for chunk in buffer[0..len].chunks_mut(chunk_size) {
-            self.wait_until_fifo_exceeds_threshold_or_payload_ready()?;
-            self.read_many(Registers::Fifo, chunk)?;
+        for b in &mut buffer[0..len] {
+            while self.is_fifo_empty()? {}
+            *b = self.read(Registers::Fifo)?;
         }
 
         self.mode(Mode::Standby)?;
@@ -310,16 +305,9 @@ where
     }
 
     /// Send bytes to another RFM69. This will block until all data are send.
-    /// This function is designed to send packets larger than the FIFO size by writing `chunk_size`
-    /// bytes at a time as soon as the `FifoThreshold` IRQ flag is cleared. The first write will have
-    /// a size of either `prefill` or the length of the packet plus the length byte, whichever is smaller.
-    /// `FifoThreshold + chunk_size` must not exceed the FIFO size (66 bytes).
-    pub fn send_large(
-        &mut self,
-        prefill: usize,
-        chunk_size: usize,
-        buffer: &[u8],
-    ) -> Result<(), Ecs, Espi> {
+    /// This function is designed to send packets larger than the FIFO size by writing data as
+    /// soon as the FIFO is not full anymore.
+    pub fn send_large(&mut self, buffer: &[u8]) -> Result<(), Ecs, Espi> {
         if buffer.is_empty() {
             return Ok(());
         }
@@ -330,15 +318,11 @@ where
         self.reset_fifo()?;
 
         self.write(Registers::Fifo, buffer.len().try_into().unwrap())?;
-
-        let first_chunk_size = min(prefill - 1, buffer.len());
-
-        self.write_many(Registers::Fifo, &buffer[..first_chunk_size])?;
         self.mode(Mode::Transmitter)?;
 
-        for i in buffer[first_chunk_size..].chunks(chunk_size) {
-            self.wait_while_fifo_exceeds_threshold()?;
-            self.write_many(Registers::Fifo, i)?;
+        for b in buffer {
+            while self.is_fifo_full()? {}
+            self.write(Registers::Fifo, *b)?;
         }
 
         self.wait_packet_sent()?;
@@ -354,6 +338,11 @@ where
     /// Check if IRQ flag FifoNotEmpty is cleared.
     pub fn is_fifo_empty(&mut self) -> Result<bool, Ecs, Espi> {
         Ok(self.read(Registers::IrqFlags2)? & 0x40 == 0)
+    }
+
+    /// Check if IRQ flag FifoFull is set.
+    pub fn is_fifo_full(&mut self) -> Result<bool, Ecs, Espi> {
+        Ok(self.read(Registers::IrqFlags2)? & 0x80 != 0)
     }
 
     /// Check if IRQ flag PacketReady is set.
@@ -470,24 +459,6 @@ where
         self.with_timeout(100, 5, |rfm| {
             Ok((rfm.read(Registers::IrqFlags2)? & 0x08) != 0)
         })
-    }
-
-    fn wait_while_fifo_exceeds_threshold(&mut self) -> Result<(), Ecs, Espi> {
-        for _ in 0..1000 {
-            if self.read(Registers::IrqFlags2)? & 0x20 == 0 {
-                return Ok(());
-            }
-        }
-        Err(Error::Timeout)
-    }
-
-    fn wait_until_fifo_exceeds_threshold_or_payload_ready(&mut self) -> Result<(), Ecs, Espi> {
-        for _ in 0..1000 {
-            if self.read(Registers::IrqFlags2)? & 0x24 != 0 {
-                return Ok(());
-            }
-        }
-        Err(Error::Timeout)
     }
 
     fn with_timeout<F>(&mut self, timeout: u8, step: u8, func: F) -> Result<(), Ecs, Espi>
