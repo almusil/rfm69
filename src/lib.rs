@@ -65,7 +65,7 @@ pub enum Error<Ecs, Espi> {
     SyncSize,
     // Packet size is longer than receive buffer
     BufferTooSmall,
-    // Packet exceeds maximum size (255 for send_large, 63 for send)
+    // Packet exceeds maximum size (255 for send_large)
     PacketTooLarge,
 }
 
