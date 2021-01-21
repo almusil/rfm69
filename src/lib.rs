@@ -63,6 +63,10 @@ pub enum Error<Ecs, Espi> {
     AesKeySize,
     // Sync sequence is too long
     SyncSize,
+    // Packet size is longer than receive buffer
+    BufferTooSmall,
+    // Packet exceeds maximum size (255 for send_large, 63 for send)
+    PacketTooLarge,
 }
 
 /// Main struct to interact with RFM69 chip.
@@ -266,15 +270,27 @@ where
     /// This function is designed to receive packets larger than the FIFO size by reading data
     /// from the FIFO as soon as it is available. This can only be used with Variable(255) packet
     /// format and node address and CRC filtering disabled.
+    /// Returns `PacketTooLarge` and discards the packet if the received length byte is larger
+    /// than the buffer size.
+    ///
+    /// ## Note
+    /// This function does not detect FIFO overruns.
     pub fn recv_large(&mut self, buffer: &mut [u8]) -> Result<usize, Ecs, Espi> {
-        if buffer.is_empty() {
-            return Ok(0);
-        }
-
         self.mode(Mode::Receiver)?;
 
         while self.is_fifo_empty()? {}
         let len: usize = self.read(Registers::Fifo)?.into();
+
+        if len > buffer.len() {
+            for _ in 0..len {
+                while self.is_fifo_empty()? {}
+                self.read(Registers::Fifo)?;
+            }
+
+            self.mode(Mode::Standby)?;
+            self.rssi = self.read(Registers::RssiValue)? as f32 / -2.0;
+            return Err(Error::PacketTooLarge);
+        }
 
         for b in &mut buffer[0..len] {
             while self.is_fifo_empty()? {}
@@ -307,17 +323,19 @@ where
     /// Send bytes to another RFM69. This will block until all data are send.
     /// This function is designed to send packets larger than the FIFO size by writing data as
     /// soon as the FIFO is not full anymore.
+    /// Immediately returns `PacketTooLarge` if the buffer is longer than 255 bytes.
+    ///
+    /// ## Note
+    /// This function does not detect FIFO underruns.
     pub fn send_large(&mut self, buffer: &[u8]) -> Result<(), Ecs, Espi> {
-        if buffer.is_empty() {
-            return Ok(());
-        }
+        let packet_size: u8 = buffer.len().try_into().or(Err(Error::PacketTooLarge))?;
 
         self.mode(Mode::Standby)?;
         self.wait_mode_ready()?;
 
         self.reset_fifo()?;
 
-        self.write(Registers::Fifo, buffer.len().try_into().unwrap())?;
+        self.write(Registers::Fifo, packet_size)?;
         self.mode(Mode::Transmitter)?;
 
         for b in buffer {
