@@ -289,7 +289,7 @@ where
 
             self.mode(Mode::Standby)?;
             self.rssi = self.read(Registers::RssiValue)? as f32 / -2.0;
-            return Err(Error::PacketTooLarge);
+            return Err(Error::BufferTooSmall);
         }
 
         for b in &mut buffer[0..len] {
