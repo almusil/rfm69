@@ -270,7 +270,7 @@ where
     /// This function is designed to receive packets larger than the FIFO size by reading data
     /// from the FIFO as soon as it is available. This can only be used with Variable(255) packet
     /// format and node address and CRC filtering disabled.
-    /// Returns `PacketTooLarge` and discards the packet if the received length byte is larger
+    /// Returns `BufferTooSmall` and discards the packet if the received length byte is larger
     /// than the buffer size.
     ///
     /// ## Note
