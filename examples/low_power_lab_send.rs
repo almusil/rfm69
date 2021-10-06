@@ -3,12 +3,12 @@ extern crate rfm69;
 
 use linux_embedded_hal::spidev::{SpiModeFlags, SpidevOptions};
 use linux_embedded_hal::sysfs_gpio::Direction;
-use linux_embedded_hal::{Delay, Pin, Spidev};
+use linux_embedded_hal::{Delay, Spidev, SysfsPin};
 use rfm69::{low_power_lab_defaults, Rfm69};
 
 fn main() {
     // Configure CS pin
-    let cs = Pin::new(25);
+    let cs = SysfsPin::new(25);
     cs.export().unwrap();
     cs.set_direction(Direction::High).unwrap();
 
@@ -46,7 +46,7 @@ fn main() {
     }
 
     // Un-export the CS pin
-    Pin::new(25).unexport().unwrap();
+    SysfsPin::new(25).unexport().unwrap();
 }
 
 #[derive(Debug)]
