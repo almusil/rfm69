@@ -15,4 +15,4 @@ description = "A generic rust driver to support RFM69 family wireless chips"
 embedded-hal = "0.2"
 
 [dev-dependencies]
-linux-embedded-hal = "0.3"
+linux-embedded-hal = "^0.3.1"
