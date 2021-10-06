@@ -25,11 +25,7 @@
 //! - [Product page](https://www.hoperf.com/modules/rf_transceiver/RFM69HCW.html)
 //! - [Datasheet](https://www.hoperf.com/data/upload/portal/20190307/RFM69HCW-V1.1.pdf)
 
-#![no_std]
-
-#[cfg(test)]
-#[macro_use]
-extern crate std;
+#![cfg_attr(not(test), no_std)]
 
 use embedded_hal::blocking::delay::DelayMs;
 use embedded_hal::blocking::spi::{Transfer, Write};
