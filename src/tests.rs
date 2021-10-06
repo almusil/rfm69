@@ -488,12 +488,12 @@ fn test_wait_mode_ready() {
 #[test]
 fn test_is_packet_ready() {
     let mut rfm = setup_rfm(Vec::new(), vec![0b00000_0_00, 0]);
-    assert_eq!(rfm.is_packet_ready().ok().unwrap(), false);
+    assert!(!rfm.is_packet_ready().ok().unwrap());
     assert_eq!(rfm.spi.rx_buffer[0], Registers::IrqFlags2.read());
 
     rfm.spi.tx_buffer[0] = 0b00000_1_00;
     rfm.spi.rx_buffer.clear();
-    assert_eq!(rfm.is_packet_ready().ok().unwrap(), true);
+    assert!(rfm.is_packet_ready().ok().unwrap());
     assert_eq!(rfm.spi.rx_buffer[0], Registers::IrqFlags2.read());
 }
 

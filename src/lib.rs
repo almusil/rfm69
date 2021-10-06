@@ -449,11 +449,9 @@ where
 
     fn dio(&mut self) -> Result<(), Ecs, Espi> {
         let mut reg = 0x07;
-        for opt_mapping in self.dio.iter() {
-            if let Some(mapping) = opt_mapping {
-                if mapping.dio_mode.eq(self.mode) {
-                    reg |= (mapping.dio_type as u16) << (mapping.pin as u16);
-                }
+        for mapping in self.dio.iter().flatten() {
+            if mapping.dio_mode.eq(self.mode) {
+                reg |= (mapping.dio_type as u16) << (mapping.pin as u16);
             }
         }
         self.write_many(Registers::DioMapping1, &reg.to_be_bytes())
