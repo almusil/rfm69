@@ -65,6 +65,22 @@ pub enum Error<Ecs, Espi> {
     PacketTooLarge,
 }
 
+/// An implementation of [`OutputPin`] which does nothing. This can be used for the CS line where it
+/// is not needed.
+pub struct NoCs;
+
+impl OutputPin for NoCs {
+    type Error = ();
+
+    fn set_low(&mut self) -> core::result::Result<(), Self::Error> {
+        Ok(())
+    }
+
+    fn set_high(&mut self) -> core::result::Result<(), Self::Error> {
+        Ok(())
+    }
+}
+
 /// Main struct to interact with RFM69 chip.
 pub struct Rfm69<T, S, D> {
     spi: S,
@@ -73,6 +89,19 @@ pub struct Rfm69<T, S, D> {
     mode: Mode,
     dio: [Option<DioMapping>; 6],
     rssi: f32,
+}
+
+impl<S, D, Espi> Rfm69<NoCs, S, D>
+where
+    S: Transactional<u8, Error = Espi>,
+    D: DelayMs<u8>,
+{
+    /// Creates a new instance with everything set to default values after restart, and no explicit
+    /// chip select line. This should be used when the chip select line is managed automatically by
+    /// the [`Transactional`] implementation, such as when using `linux_embedded_hal`.
+    pub fn new_without_cs(spi: S, delay: D) -> Self {
+        Self::new(spi, NoCs, delay)
+    }
 }
 
 impl<T, S, D, Ecs, Espi> Rfm69<T, S, D>
