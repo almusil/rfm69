@@ -1,8 +1,9 @@
 # rfm69
- A generic `no_std` rust driver to support RFM69 family wireless chips.
- 
- [![Build Status](https://api.travis-ci.com/almusil/rfm69.svg?branch=master)](https://travis-ci.com//almusil/rfm69)
 
+A generic `no_std` rust driver to support RFM69 family wireless chips.
+ 
+[![crates.io page](https://img.shields.io/crates/v/rfm69.svg)](https://crates.io/crates/rfm69)
+[![docs.rs page](https://docs.rs/rfm69/badge.svg)](https://docs.rs/rfm69)
 
 ## Examples
 
