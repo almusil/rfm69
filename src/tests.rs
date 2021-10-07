@@ -4,23 +4,8 @@ use crate::registers::*;
 use crate::*;
 use embedded_hal::blocking::delay::DelayMs;
 use embedded_hal::blocking::spi::{Transactional, Transfer, Write};
-use embedded_hal::digital::v2::OutputPin;
 
 use std::prelude::v1::*;
-
-struct OutputPinMock;
-
-impl OutputPin for OutputPinMock {
-    type Error = ();
-
-    fn set_low(&mut self) -> std::result::Result<(), Self::Error> {
-        Ok(())
-    }
-
-    fn set_high(&mut self) -> std::result::Result<(), Self::Error> {
-        Ok(())
-    }
-}
 
 struct SpiMock {
     rx_buffer: Vec<u8>,
@@ -73,13 +58,13 @@ impl DelayMs<u8> for DelayMock {
     fn delay_ms(&mut self, _: u8) {}
 }
 
-fn setup_rfm(rx_buffer: Vec<u8>, tx_buffer: Vec<u8>) -> Rfm69<OutputPinMock, SpiMock, DelayMock> {
+fn setup_rfm(rx_buffer: Vec<u8>, tx_buffer: Vec<u8>) -> Rfm69<NoCs, SpiMock, DelayMock> {
     Rfm69 {
         spi: SpiMock {
             rx_buffer,
             tx_buffer,
         },
-        cs: OutputPinMock,
+        cs: NoCs,
         delay: DelayMock,
         mode: Mode::Standby,
         dio: [None; 6],
