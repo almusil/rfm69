@@ -28,7 +28,7 @@
 #![cfg_attr(not(test), no_std)]
 
 use embedded_hal::blocking::delay::DelayMs;
-use embedded_hal::blocking::spi::{Transfer, Write};
+use embedded_hal::blocking::spi::{Operation, Transactional};
 use embedded_hal::digital::v2::OutputPin;
 
 use core::{convert::TryInto, marker::PhantomData};
@@ -78,8 +78,7 @@ pub struct Rfm69<T, S, D> {
 impl<T, S, D, Ecs, Espi> Rfm69<T, S, D>
 where
     T: OutputPin<Error = Ecs>,
-    S: Transfer<u8, Error = Espi>,
-    S: Write<u8, Error = Espi>,
+    S: Transactional<u8, Error = Espi>,
     D: DelayMs<u8>,
 {
     /// Creates a new instance with everything set to default values after restart.
@@ -426,8 +425,9 @@ where
     pub fn write_many(&mut self, reg: Registers, data: &[u8]) -> Result<(), Ecs, Espi> {
         let mut guard = CsGuard::new(&mut self.cs);
         guard.select()?;
-        self.spi.write(&[reg.write()]).map_err(Error::Spi)?;
-        self.spi.write(data).map_err(Error::Spi)?;
+        let write = [reg.write()];
+        let mut operations = [Operation::Write(&write), Operation::Write(data)];
+        self.spi.exec(&mut operations).map_err(Error::Spi)?;
         Ok(())
     }
 
@@ -442,8 +442,9 @@ where
     pub fn read_many(&mut self, reg: Registers, buffer: &mut [u8]) -> Result<(), Ecs, Espi> {
         let mut guard = CsGuard::new(&mut self.cs);
         guard.select()?;
-        self.spi.write(&[reg.read()]).map_err(Error::Spi)?;
-        self.spi.transfer(buffer).map_err(Error::Spi)?;
+        let read = [reg.read()];
+        let mut operations = [Operation::Write(&read), Operation::Transfer(buffer)];
+        self.spi.exec(&mut operations).map_err(Error::Spi)?;
         Ok(())
     }
 
@@ -547,8 +548,7 @@ pub fn low_power_lab_defaults<T, S, D, Ecs, Espi>(
 ) -> Result<Rfm69<T, S, D>, Ecs, Espi>
 where
     T: OutputPin<Error = Ecs>,
-    S: Transfer<u8, Error = Espi>,
-    S: Write<u8, Error = Espi>,
+    S: Transactional<u8, Error = Espi>,
     D: DelayMs<u8>,
 {
     rfm.mode(Mode::Standby)?;
