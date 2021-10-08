@@ -28,7 +28,7 @@
 #![cfg_attr(not(test), no_std)]
 
 use embedded_hal::blocking::delay::DelayMs;
-use embedded_hal::blocking::spi::{Operation, Transactional};
+use embedded_hal::blocking::spi::{Operation, Transactional, Transfer, Write};
 use embedded_hal::digital::v2::OutputPin;
 
 use core::{convert::TryInto, marker::PhantomData};
@@ -81,6 +81,61 @@ impl OutputPin for NoCs {
     }
 }
 
+pub trait ReadWrite {
+    type Error;
+
+    /// Direct write to RFM69 registers.
+    fn write_many(&mut self, reg: Registers, data: &[u8]) -> core::result::Result<(), Self::Error>;
+
+    /// Direct read from RFM69 registers.
+    fn read_many(
+        &mut self,
+        reg: Registers,
+        buffer: &mut [u8],
+    ) -> core::result::Result<(), Self::Error>;
+}
+
+impl<S, E> ReadWrite for S
+where
+    S: Transactional<u8, Error = E>,
+{
+    type Error = E;
+
+    fn write_many(&mut self, reg: Registers, data: &[u8]) -> core::result::Result<(), E> {
+        let write = [reg.write()];
+        let mut operations = [Operation::Write(&write), Operation::Write(data)];
+        self.exec(&mut operations)
+    }
+
+    fn read_many(&mut self, reg: Registers, buffer: &mut [u8]) -> core::result::Result<(), E> {
+        let read = [reg.read()];
+        let mut operations = [Operation::Write(&read), Operation::Transfer(buffer)];
+        self.exec(&mut operations)
+    }
+}
+
+pub struct SpiDirect<S>(S);
+
+impl<S, E> ReadWrite for SpiDirect<S>
+where
+    S: Transfer<u8, Error = E>,
+    S: Write<u8, Error = E>,
+{
+    type Error = E;
+
+    fn write_many(&mut self, reg: Registers, data: &[u8]) -> core::result::Result<(), E> {
+        self.0.write(&[reg.write()])?;
+        self.0.write(data)?;
+        Ok(())
+    }
+
+    fn read_many(&mut self, reg: Registers, buffer: &mut [u8]) -> core::result::Result<(), E> {
+        self.0.write(&[reg.read()])?;
+        self.0.transfer(buffer)?;
+        Ok(())
+    }
+}
+
 /// Main struct to interact with RFM69 chip.
 pub struct Rfm69<T, S, D> {
     spi: S,
@@ -104,10 +159,26 @@ where
     }
 }
 
+impl<T, S, D, Ecs, Espi> Rfm69<T, SpiDirect<S>, D>
+where
+    S: Transfer<u8, Error = Espi>,
+    S: Write<u8, Error = Espi>,
+    T: OutputPin<Error = Ecs>,
+    D: DelayMs<u8>,
+{
+    /// Creates a new instance with everything set to default values after restart.
+    ///
+    /// Use this constructor if the SPI implementation only implements the [`Write`] and
+    /// [`Transfer`] traits, not [`Transactional`].
+    pub fn new_write_transfer(spi: S, cs: T, delay: D) -> Self {
+        Self::new(SpiDirect(spi), cs, delay)
+    }
+}
+
 impl<T, S, D, Ecs, Espi> Rfm69<T, S, D>
 where
     T: OutputPin<Error = Ecs>,
-    S: Transactional<u8, Error = Espi>,
+    S: ReadWrite<Error = Espi>,
     D: DelayMs<u8>,
 {
     /// Creates a new instance with everything set to default values after restart.
@@ -454,10 +525,7 @@ where
     pub fn write_many(&mut self, reg: Registers, data: &[u8]) -> Result<(), Ecs, Espi> {
         let mut guard = CsGuard::new(&mut self.cs);
         guard.select()?;
-        let write = [reg.write()];
-        let mut operations = [Operation::Write(&write), Operation::Write(data)];
-        self.spi.exec(&mut operations).map_err(Error::Spi)?;
-        Ok(())
+        self.spi.write_many(reg, data).map_err(Error::Spi)
     }
 
     /// Direct read from RFM69 registers.
@@ -471,10 +539,7 @@ where
     pub fn read_many(&mut self, reg: Registers, buffer: &mut [u8]) -> Result<(), Ecs, Espi> {
         let mut guard = CsGuard::new(&mut self.cs);
         guard.select()?;
-        let read = [reg.read()];
-        let mut operations = [Operation::Write(&read), Operation::Transfer(buffer)];
-        self.spi.exec(&mut operations).map_err(Error::Spi)?;
-        Ok(())
+        self.spi.read_many(reg, buffer).map_err(Error::Spi)
     }
 
     fn dio(&mut self) -> Result<(), Ecs, Espi> {
@@ -577,7 +642,7 @@ pub fn low_power_lab_defaults<T, S, D, Ecs, Espi>(
 ) -> Result<Rfm69<T, S, D>, Ecs, Espi>
 where
     T: OutputPin<Error = Ecs>,
-    S: Transactional<u8, Error = Espi>,
+    S: ReadWrite<Error = Espi>,
     D: DelayMs<u8>,
 {
     rfm.mode(Mode::Standby)?;
