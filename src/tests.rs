@@ -59,17 +59,13 @@ impl DelayMs<u8> for DelayMock {
 }
 
 fn setup_rfm(rx_buffer: Vec<u8>, tx_buffer: Vec<u8>) -> Rfm69<NoCs, SpiMock, DelayMock> {
-    Rfm69 {
-        spi: SpiMock {
+    Rfm69::new_without_cs(
+        SpiMock {
             rx_buffer,
             tx_buffer,
         },
-        cs: NoCs,
-        delay: DelayMock,
-        mode: Mode::Standby,
-        dio: [None; 6],
-        rssi: 0.0,
-    }
+        DelayMock,
+    )
 }
 
 #[test]
