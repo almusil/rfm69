@@ -78,6 +78,22 @@ fn test_read_all_regs() {
 }
 
 #[test]
+fn test_read_all_regs_write_transfer() {
+    let mut rfm = Rfm69::new_write_transfer(
+        SpiMock {
+            rx_buffer: Vec::new(),
+            tx_buffer: (1..=0x4f).collect(),
+        },
+        NoCs,
+        DelayMock,
+    );
+
+    let result = rfm.read_all_regs().unwrap_or([0; 0x4f]);
+    assert_eq!(rfm.spi.0.rx_buffer[0], Registers::OpMode.read());
+    assert_eq!(result.as_ref(), rfm.spi.0.tx_buffer.as_slice());
+}
+
+#[test]
 fn test_mode() {
     let mut rfm = setup_rfm(Vec::new(), vec![0b111_001_11, 0]);
 
