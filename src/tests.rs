@@ -59,11 +59,12 @@ impl DelayMs<u8> for DelayMock {
 }
 
 fn setup_rfm(rx_buffer: Vec<u8>, tx_buffer: Vec<u8>) -> Rfm69<NoCs, SpiMock, DelayMock> {
-    Rfm69::new_without_cs(
+    Rfm69::new(
         SpiMock {
             rx_buffer,
             tx_buffer,
         },
+        NoCs,
         DelayMock,
     )
 }
@@ -78,13 +79,12 @@ fn test_read_all_regs() {
 }
 
 #[test]
-fn test_read_all_regs_write_transfer() {
-    let mut rfm = Rfm69::new_write_transfer(
+fn test_read_all_regs_transactional() {
+    let mut rfm = Rfm69::new_without_cs(
         SpiMock {
             rx_buffer: Vec::new(),
             tx_buffer: (1..=0x4f).collect(),
         },
-        NoCs,
         DelayMock,
     );
 

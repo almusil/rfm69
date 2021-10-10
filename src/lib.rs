@@ -95,7 +95,9 @@ pub trait ReadWrite {
     ) -> core::result::Result<(), Self::Error>;
 }
 
-impl<S, E> ReadWrite for S
+pub struct SpiTransactional<S>(S);
+
+impl<S, E> ReadWrite for SpiTransactional<S>
 where
     S: Transactional<u8, Error = E>,
 {
@@ -104,19 +106,17 @@ where
     fn write_many(&mut self, reg: Registers, data: &[u8]) -> core::result::Result<(), E> {
         let write = [reg.write()];
         let mut operations = [Operation::Write(&write), Operation::Write(data)];
-        self.exec(&mut operations)
+        self.0.exec(&mut operations)
     }
 
     fn read_many(&mut self, reg: Registers, buffer: &mut [u8]) -> core::result::Result<(), E> {
         let read = [reg.read()];
         let mut operations = [Operation::Write(&read), Operation::Transfer(buffer)];
-        self.exec(&mut operations)
+        self.0.exec(&mut operations)
     }
 }
 
-pub struct SpiDirect<S>(S);
-
-impl<S, E> ReadWrite for SpiDirect<S>
+impl<S, E> ReadWrite for S
 where
     S: Transfer<u8, Error = E>,
     S: Write<u8, Error = E>,
@@ -124,14 +124,14 @@ where
     type Error = E;
 
     fn write_many(&mut self, reg: Registers, data: &[u8]) -> core::result::Result<(), E> {
-        self.0.write(&[reg.write()])?;
-        self.0.write(data)?;
+        self.write(&[reg.write()])?;
+        self.write(data)?;
         Ok(())
     }
 
     fn read_many(&mut self, reg: Registers, buffer: &mut [u8]) -> core::result::Result<(), E> {
-        self.0.write(&[reg.read()])?;
-        self.0.transfer(buffer)?;
+        self.write(&[reg.read()])?;
+        self.transfer(buffer)?;
         Ok(())
     }
 }
@@ -146,7 +146,7 @@ pub struct Rfm69<T, S, D> {
     rssi: f32,
 }
 
-impl<S, D, Espi> Rfm69<NoCs, S, D>
+impl<S, D, Espi> Rfm69<NoCs, SpiTransactional<S>, D>
 where
     S: Transactional<u8, Error = Espi>,
     D: DelayMs<u8>,
@@ -155,23 +155,7 @@ where
     /// chip select line. This should be used when the chip select line is managed automatically by
     /// the [`Transactional`] implementation, such as when using `linux_embedded_hal`.
     pub fn new_without_cs(spi: S, delay: D) -> Self {
-        Self::new(spi, NoCs, delay)
-    }
-}
-
-impl<T, S, D, Ecs, Espi> Rfm69<T, SpiDirect<S>, D>
-where
-    S: Transfer<u8, Error = Espi>,
-    S: Write<u8, Error = Espi>,
-    T: OutputPin<Error = Ecs>,
-    D: DelayMs<u8>,
-{
-    /// Creates a new instance with everything set to default values after restart.
-    ///
-    /// Use this constructor if the SPI implementation only implements the [`Write`] and
-    /// [`Transfer`] traits, not [`Transactional`].
-    pub fn new_write_transfer(spi: S, cs: T, delay: D) -> Self {
-        Self::new(SpiDirect(spi), cs, delay)
+        Self::new(SpiTransactional(spi), NoCs, delay)
     }
 }
 
