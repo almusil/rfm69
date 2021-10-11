@@ -1,11 +1,12 @@
 #![allow(clippy::unusual_byte_groupings)]
 
-use crate::registers::*;
-use crate::*;
+use std::prelude::v1::*;
+
 use embedded_hal::blocking::delay::DelayMs;
 use embedded_hal::blocking::spi::{Operation, Transactional, Transfer, Write};
 
-use std::prelude::v1::*;
+use crate::registers::*;
+use crate::*;
 
 struct SpiMock {
     rx_buffer: Vec<u8>,
