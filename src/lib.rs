@@ -33,6 +33,7 @@ use embedded_hal::digital::v2::OutputPin;
 
 use core::{convert::TryInto, marker::PhantomData};
 
+use crate::error::Result;
 use crate::registers::{
     ContinuousDagc, DataMode, DccCutoff, DioMapping, DioPin, FifoMode, InterPacketRxDelay,
     LnaConfig, LnaGain, LnaImpedance, Mode, Modulation, ModulationShaping, ModulationType,
@@ -40,30 +41,13 @@ use crate::registers::{
     RxBwFreq, RxBwFsk, SensitivityBoost,
 };
 
+pub use crate::error::Error;
+
+mod error;
 pub mod registers;
 
 const FOSC: f32 = 32_000_000.0;
 const FSTEP: f32 = FOSC / 524_288.0; // FOSC/2^19
-
-type Result<T, Ecs, Espi> = core::result::Result<T, Error<Ecs, Espi>>;
-
-#[derive(Debug)]
-pub enum Error<Ecs, Espi> {
-    // Chip select pin error
-    Cs(Ecs),
-    // SPI bus error
-    Spi(Espi),
-    // Timeout exceeded
-    Timeout,
-    // Aes key size is too big
-    AesKeySize,
-    // Sync sequence is too long
-    SyncSize,
-    // Packet size is longer than receive buffer
-    BufferTooSmall,
-    // Packet exceeds maximum size (255 for send_large)
-    PacketTooLarge,
-}
 
 /// An implementation of [`OutputPin`] which does nothing. This can be used for the CS line where it
 /// is not needed.
