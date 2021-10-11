@@ -3,7 +3,7 @@
 use crate::registers::*;
 use crate::*;
 use embedded_hal::blocking::delay::DelayMs;
-use embedded_hal::blocking::spi::{Transactional, Transfer, Write};
+use embedded_hal::blocking::spi::{Operation, Transactional, Transfer, Write};
 
 use std::prelude::v1::*;
 
