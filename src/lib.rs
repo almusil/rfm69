@@ -31,8 +31,9 @@ use embedded_hal::blocking::delay::DelayMs;
 use embedded_hal::blocking::spi::{Operation, Transactional, Transfer, Write};
 use embedded_hal::digital::v2::OutputPin;
 
-use core::{convert::TryInto, marker::PhantomData};
+use core::convert::TryInto;
 
+use crate::cs::CsGuard;
 use crate::error::Result;
 use crate::registers::{
     ContinuousDagc, DataMode, DccCutoff, DioMapping, DioPin, FifoMode, InterPacketRxDelay,
@@ -41,29 +42,15 @@ use crate::registers::{
     RxBwFreq, RxBwFsk, SensitivityBoost,
 };
 
+pub use crate::cs::NoCs;
 pub use crate::error::Error;
 
+mod cs;
 mod error;
 pub mod registers;
 
 const FOSC: f32 = 32_000_000.0;
 const FSTEP: f32 = FOSC / 524_288.0; // FOSC/2^19
-
-/// An implementation of [`OutputPin`] which does nothing. This can be used for the CS line where it
-/// is not needed.
-pub struct NoCs;
-
-impl OutputPin for NoCs {
-    type Error = ();
-
-    fn set_low(&mut self) -> core::result::Result<(), Self::Error> {
-        Ok(())
-    }
-
-    fn set_high(&mut self) -> core::result::Result<(), Self::Error> {
-        Ok(())
-    }
-}
 
 pub trait ReadWrite {
     type Error;
@@ -491,8 +478,7 @@ where
 
     /// Direct write to RFM69 registers.
     pub fn write_many(&mut self, reg: Registers, data: &[u8]) -> Result<(), Ecs, Espi> {
-        let mut guard = CsGuard::new(&mut self.cs);
-        guard.select()?;
+        let _guard = CsGuard::new(&mut self.cs)?;
         self.spi.write_many(reg, data).map_err(Error::Spi)
     }
 
@@ -505,8 +491,7 @@ where
 
     /// Direct read from RFM69 registers.
     pub fn read_many(&mut self, reg: Registers, buffer: &mut [u8]) -> Result<(), Ecs, Espi> {
-        let mut guard = CsGuard::new(&mut self.cs);
-        guard.select()?;
+        let _guard = CsGuard::new(&mut self.cs)?;
         self.spi.read_many(reg, buffer).map_err(Error::Spi)
     }
 
@@ -559,45 +544,6 @@ where
     {
         let val = self.read(reg)?;
         self.write(reg, f(val))
-    }
-}
-
-struct CsGuard<'a, T, Ecs, Espi>
-where
-    T: OutputPin<Error = Ecs>,
-{
-    cs: &'a mut T,
-    _phantom: PhantomData<Espi>,
-}
-
-impl<'a, T, Ecs, Espi> CsGuard<'a, T, Ecs, Espi>
-where
-    T: OutputPin<Error = Ecs>,
-{
-    fn new(pin: &'a mut T) -> Self {
-        CsGuard {
-            cs: pin,
-            _phantom: PhantomData,
-        }
-    }
-
-    fn select(&mut self) -> Result<(), Ecs, Espi> {
-        self.cs.set_low().map_err(Error::Cs)
-    }
-
-    fn unselect(&mut self) -> Result<(), Ecs, Espi> {
-        self.cs.set_high().map_err(Error::Cs)
-    }
-}
-
-impl<'a, T, Ecs, Espi> Drop for CsGuard<'a, T, Ecs, Espi>
-where
-    T: OutputPin<Error = Ecs>,
-{
-    fn drop(&mut self) {
-        if self.unselect().is_err() {
-            panic!("Cannot clear CS guard");
-        }
     }
 }
 
