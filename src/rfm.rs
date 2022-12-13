@@ -403,13 +403,15 @@ where
         self.spi.read_many(reg, buffer).map_err(Error::Spi)
     }
 
-    pub(crate) fn wait_mode_ready(&mut self) -> Result<(), Ecs, Espi> {
+    /// Wait for device is ready
+    pub fn wait_mode_ready(&mut self) -> Result<(), Ecs, Espi> {
         self.with_timeout(100, 5, |rfm| {
             Ok((rfm.read(Registers::IrqFlags1)? & 0x80) != 0)
         })
     }
 
-    pub(crate) fn wait_packet_sent(&mut self) -> Result<(), Ecs, Espi> {
+    /// Wait for packed send
+    pub fn wait_packet_sent(&mut self) -> Result<(), Ecs, Espi> {
         self.with_timeout(100, 5, |rfm| {
             Ok((rfm.read(Registers::IrqFlags2)? & 0x08) != 0)
         })
