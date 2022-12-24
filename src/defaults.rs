@@ -15,7 +15,7 @@ use crate::Rfm69;
 pub fn low_power_lab_defaults<T, S, D, Ecs, Espi>(
     mut rfm: Rfm69<T, S, D>,
     network_id: u8,
-    frequency: f32,
+    frequency: u32,
 ) -> Result<Rfm69<T, S, D>, Ecs, Espi>
 where
     T: OutputPin<Error = Ecs>,
@@ -28,9 +28,9 @@ where
         modulation_type: ModulationType::Fsk,
         shaping: ModulationShaping::Shaping00,
     })?;
-    rfm.bit_rate(55_555.0)?;
+    rfm.bit_rate(55_555)?;
     rfm.frequency(frequency)?;
-    rfm.fdev(50_000.0)?;
+    rfm.fdev(50_000)?;
     rfm.rx_bw(RxBw {
         dcc_cutoff: DccCutoff::Percent4,
         rx_bw: RxBwFsk::Khz125dot0,

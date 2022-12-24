@@ -24,7 +24,7 @@ fn main() -> Result<()> {
     let mut rfm = rfm_error!(low_power_lab_defaults(
         Rfm69::new(spi, cs, Delay),
         100,
-        433_000_000.0
+        433_000_000
     ))?;
 
     // Print content of all RFM registers
