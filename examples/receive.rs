@@ -1,7 +1,7 @@
 use anyhow::Result;
 use linux_embedded_hal::spidev::{SpiModeFlags, SpidevOptions};
 use linux_embedded_hal::sysfs_gpio::Direction;
-use linux_embedded_hal::{Delay, Spidev, SysfsPin};
+use linux_embedded_hal::{Spidev, SysfsPin};
 use rfm69::Rfm69;
 use utilities::rfm_error;
 
@@ -21,7 +21,7 @@ fn main() -> Result<()> {
     spi.configure(&options)?;
 
     // Create rfm struct with defaults that are set after reset
-    let mut rfm = Rfm69::new(spi, cs, Delay);
+    let mut rfm = Rfm69::new(spi, cs);
 
     // Print content of all RFM registers
     for (index, val) in rfm_error!(rfm.read_all_regs())?.iter().enumerate() {

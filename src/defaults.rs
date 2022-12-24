@@ -1,4 +1,3 @@
-use embedded_hal::blocking::delay::DelayMs;
 use embedded_hal::digital::v2::OutputPin;
 
 use crate::error::Result;
@@ -12,15 +11,14 @@ use crate::Rfm69;
 
 /// Configures RFM69 according to [LowPowerLab](https://github.com/LowPowerLab/RFM69) Arduino
 /// library
-pub fn low_power_lab_defaults<T, S, D, Ecs, Espi>(
-    mut rfm: Rfm69<T, S, D>,
+pub fn low_power_lab_defaults<T, S, Ecs, Espi>(
+    mut rfm: Rfm69<T, S>,
     network_id: u8,
     frequency: u32,
-) -> Result<Rfm69<T, S, D>, Ecs, Espi>
+) -> Result<Rfm69<T, S>, Ecs, Espi>
 where
     T: OutputPin<Error = Ecs>,
     S: ReadWrite<Error = Espi>,
-    D: DelayMs<u8>,
 {
     rfm.mode(Mode::Standby)?;
     rfm.modulation(Modulation {
