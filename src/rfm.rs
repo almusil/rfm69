@@ -68,6 +68,10 @@ where
 
     /// Sets the mode in corresponding register `RegOpMode (0x01)`.
     pub fn mode(&mut self, mode: Mode) -> Result<(), Ecs, Espi> {
+        if self.mode == mode {
+            return Ok(());
+        }
+
         self.update(Registers::OpMode, |r| (r & 0xe3) | mode as u8)?;
         self.mode = mode;
         self.dio()
@@ -207,6 +211,19 @@ where
     /// Receive bytes from another RFM69. This call blocks until there are any
     /// bytes available. This can be combined with DIO interrupt for `PayloadReady`, calling
     /// `recv` immediately after the interrupt should not block.
+    /// ## Note
+    /// To further ensure that `recv` will not block the RFM can be switch to
+    /// receiver mode and the check for `is_packet_ready` can be done outside.
+    /// ```ignore
+    /// use rfm69::registers::Mode;
+    ///
+    /// rfm.mode(Mode::Receiver)?;
+    /// if rfm.is_packet_ready()? {
+    ///     // This call will not block.
+    ///     rfm.recv(buffer)?;
+    /// }
+    ///
+    /// ```
     pub fn recv(&mut self, buffer: &mut [u8]) -> Result<(), Ecs, Espi> {
         if buffer.is_empty() {
             return Ok(());
@@ -261,7 +278,7 @@ where
         Ok(len)
     }
 
-    /// Send bytes to another RFM69. This can block until all data are send.
+    /// Send bytes to another RFM69. This can block until all data are sent.
     pub fn send(&mut self, buffer: &[u8]) -> Result<(), Ecs, Espi> {
         if buffer.is_empty() {
             return Ok(());
