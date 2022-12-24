@@ -182,21 +182,21 @@ fn test_modulation() {
 fn test_bitrate() {
     let mut rfm = setup_rfm(Vec::new(), vec![0, 0, 0]);
 
-    rfm.bit_rate(9_600.0).ok().unwrap();
+    rfm.bit_rate(9_600).ok().unwrap();
     assert_eq!(
         rfm.spi.rx_buffer[0..=2],
         [Registers::BitrateMsb.write(), 0x0d, 0x05]
     );
 
     rfm.spi.rx_buffer.clear();
-    rfm.bit_rate(150_000.0).ok().unwrap();
+    rfm.bit_rate(150_000).ok().unwrap();
     assert_eq!(
         rfm.spi.rx_buffer[0..=2],
         [Registers::BitrateMsb.write(), 0x00, 0xd5]
     );
 
     rfm.spi.rx_buffer.clear();
-    rfm.bit_rate(32_768.0).ok().unwrap();
+    rfm.bit_rate(32_768).ok().unwrap();
     assert_eq!(
         rfm.spi.rx_buffer[0..=2],
         [Registers::BitrateMsb.write(), 0x03, 0xd0]
@@ -207,21 +207,21 @@ fn test_bitrate() {
 fn test_fdev() {
     let mut rfm = setup_rfm(Vec::new(), vec![0, 0, 0]);
 
-    rfm.fdev(10_000.0).ok().unwrap();
+    rfm.fdev(10_000).ok().unwrap();
     assert_eq!(
         rfm.spi.rx_buffer[0..=2],
         [Registers::FdevMsb.write(), 0x00, 0xa3]
     );
 
     rfm.spi.rx_buffer.clear();
-    rfm.fdev(200_000.0).ok().unwrap();
+    rfm.fdev(200_000).ok().unwrap();
     assert_eq!(
         rfm.spi.rx_buffer[0..=2],
         [Registers::FdevMsb.write(), 0x0c, 0xcc]
     );
 
     rfm.spi.rx_buffer.clear();
-    rfm.fdev(260_000.0).ok().unwrap();
+    rfm.fdev(260_000).ok().unwrap();
     assert_eq!(
         rfm.spi.rx_buffer[0..=2],
         [Registers::FdevMsb.write(), 0x10, 0xa3]
@@ -232,21 +232,21 @@ fn test_fdev() {
 fn test_frequency() {
     let mut rfm = setup_rfm(Vec::new(), vec![0, 0, 0, 0]);
 
-    rfm.frequency(433_000_000.0).ok().unwrap();
+    rfm.frequency(433_000_000).ok().unwrap();
     assert_eq!(
         rfm.spi.rx_buffer[0..=3],
         [Registers::FrfMsb.write(), 0x6c, 0x40, 0x00]
     );
 
     rfm.spi.rx_buffer.clear();
-    rfm.frequency(868_000_000.0).ok().unwrap();
+    rfm.frequency(868_000_000).ok().unwrap();
     assert_eq!(
         rfm.spi.rx_buffer[0..=3],
         [Registers::FrfMsb.write(), 0xd9, 0x00, 0x00]
     );
 
     rfm.spi.rx_buffer.clear();
-    rfm.frequency(915_000_000.0).ok().unwrap();
+    rfm.frequency(915_000_000).ok().unwrap();
     assert_eq!(
         rfm.spi.rx_buffer[0..=3],
         [Registers::FrfMsb.write(), 0xe4, 0xc0, 0x00]

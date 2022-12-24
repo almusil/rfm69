@@ -12,8 +12,16 @@ use crate::registers::{
 };
 use crate::rw::{ReadWrite, SpiTransactional};
 
-const FOSC: f32 = 32_000_000.0;
-const FSTEP: f32 = FOSC / 524_288.0; // FOSC/2^19
+// 1_000_000 larger for better precision.
+const F_SCALE: u64 = 1_000_000;
+const FOSC: u64 = 32_000_000 * F_SCALE;
+const FSTEP: u64 = FOSC / 524_288; // FOSC/2^19
+
+macro_rules! _f_scale {
+    ($val:ident) => {
+        u64::from($val) * F_SCALE
+    };
+}
 
 /// Main struct to interact with RFM69 chip.
 pub struct Rfm69<T, S, D> {
@@ -22,7 +30,7 @@ pub struct Rfm69<T, S, D> {
     delay: D,
     mode: Mode,
     dio: [Option<DioMapping>; 6],
-    rssi: f32,
+    rssi: i16,
 }
 
 impl<S, D, Espi> Rfm69<NoCs, SpiTransactional<S>, D>
@@ -52,7 +60,7 @@ where
             delay,
             mode: Mode::Standby,
             dio: [None; 6],
-            rssi: 0.0,
+            rssi: 0,
         }
     }
 
@@ -65,8 +73,7 @@ where
 
     /// Sets the mode in corresponding register `RegOpMode (0x01)`.
     pub fn mode(&mut self, mode: Mode) -> Result<(), Ecs, Espi> {
-        let val = mode as u8;
-        self.update(Registers::OpMode, |r| (r & 0xe3) | val)?;
+        self.update(Registers::OpMode, |r| (r & 0xe3) | mode as u8)?;
         self.mode = mode;
         self.dio()
     }
@@ -78,22 +85,22 @@ where
 
     /// Computes the bitrate, according to `Fosc / bit_rate` and stores it in
     /// `RegBitrateMsb (0x03), RegBitrateLsb (0x04)`.
-    pub fn bit_rate(&mut self, bit_rate: f32) -> Result<(), Ecs, Espi> {
-        let reg = (FOSC / bit_rate) as u16;
+    pub fn bit_rate(&mut self, bit_rate: u32) -> Result<(), Ecs, Espi> {
+        let reg = (FOSC / _f_scale!(bit_rate)) as u16;
         self.write_many(Registers::BitrateMsb, &reg.to_be_bytes())
     }
 
     /// Computes the frequency deviation, according to `fdev / Fstep` and stores it in
     /// `RegFdevMsb (0x05), RegFdevLsb (0x06)`.
-    pub fn fdev(&mut self, fdev: f32) -> Result<(), Ecs, Espi> {
-        let reg = (fdev / FSTEP) as u16;
+    pub fn fdev(&mut self, fdev: u32) -> Result<(), Ecs, Espi> {
+        let reg = (_f_scale!(fdev) / FSTEP) as u16;
         self.write_many(Registers::FdevMsb, &reg.to_be_bytes())
     }
 
     /// Computes the radio frequency, according to `frequency / Fstep` and stores it in
     /// `RegFrfMsb (0x07), RegFrfMid (0x08), RegFrfLsb (0x09)`.
-    pub fn frequency(&mut self, frequency: f32) -> Result<(), Ecs, Espi> {
-        let reg = (frequency / FSTEP) as u32;
+    pub fn frequency(&mut self, frequency: u32) -> Result<(), Ecs, Espi> {
+        let reg = (_f_scale!(frequency) / FSTEP) as u32;
         self.write_many(Registers::FrfMsb, &reg.to_be_bytes()[1..])
     }
 
@@ -198,7 +205,7 @@ where
     }
 
     /// Last RSSI value that was computed during receive.
-    pub fn rssi(&self) -> f32 {
+    pub fn rssi(&self) -> i16 {
         self.rssi
     }
 
@@ -217,7 +224,7 @@ where
 
         self.mode(Mode::Standby)?;
         self.read_many(Registers::Fifo, buffer)?;
-        self.rssi = self.read(Registers::RssiValue)? as f32 / -2.0;
+        self.rssi = self.read_rssi()?;
         Ok(())
     }
 
@@ -246,7 +253,7 @@ where
             }
 
             self.mode(Mode::Standby)?;
-            self.rssi = self.read(Registers::RssiValue)? as f32 / -2.0;
+            self.rssi = self.read_rssi()?;
             return Err(Error::BufferTooSmall);
         }
 
@@ -256,7 +263,7 @@ where
         }
 
         self.mode(Mode::Standby)?;
-        self.rssi = self.read(Registers::RssiValue)? as f32 / -2.0;
+        self.rssi = self.read_rssi()?;
         Ok(len)
     }
 
@@ -423,6 +430,10 @@ where
             }
         }
         self.write_many(Registers::DioMapping1, &reg.to_be_bytes())
+    }
+
+    fn read_rssi(&mut self) -> Result<i16, Ecs, Espi> {
+        Ok(-i16::from(self.read(Registers::RssiValue)?) >> 1)
     }
 
     fn reset_fifo(&mut self) -> Result<(), Ecs, Espi> {
