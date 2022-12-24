@@ -2,7 +2,6 @@
 
 use std::prelude::v1::*;
 
-use embedded_hal::blocking::delay::DelayMs;
 use embedded_hal::blocking::spi::{Operation, Transactional, Transfer, Write};
 
 use crate::registers::*;
@@ -53,20 +52,13 @@ impl Transactional<u8> for SpiMock {
     }
 }
 
-struct DelayMock;
-
-impl DelayMs<u8> for DelayMock {
-    fn delay_ms(&mut self, _: u8) {}
-}
-
-fn setup_rfm(rx_buffer: Vec<u8>, tx_buffer: Vec<u8>) -> Rfm69<NoCs, SpiMock, DelayMock> {
+fn setup_rfm(rx_buffer: Vec<u8>, tx_buffer: Vec<u8>) -> Rfm69<NoCs, SpiMock> {
     Rfm69::new(
         SpiMock {
             rx_buffer,
             tx_buffer,
         },
         NoCs,
-        DelayMock,
     )
 }
 
@@ -81,13 +73,10 @@ fn test_read_all_regs() {
 
 #[test]
 fn test_read_all_regs_transactional() {
-    let mut rfm = Rfm69::new_without_cs(
-        SpiMock {
-            rx_buffer: Vec::new(),
-            tx_buffer: (1..=0x4f).collect(),
-        },
-        DelayMock,
-    );
+    let mut rfm = Rfm69::new_without_cs(SpiMock {
+        rx_buffer: Vec::new(),
+        tx_buffer: (1..=0x4f).collect(),
+    });
 
     let result = rfm.read_all_regs().unwrap_or([0; 0x4f]);
     assert_eq!(rfm.spi.0.rx_buffer[0], Registers::OpMode.read());
@@ -490,15 +479,15 @@ fn test_aes() {
 }
 
 #[test]
-fn test_wait_mode_ready() {
+fn test_is_mode_ready() {
     let mut rfm = setup_rfm(Vec::new(), vec![0b0_0000000, 0]);
 
-    rfm.wait_mode_ready().err().unwrap();
+    assert!(!rfm.is_mode_ready().ok().unwrap());
     assert_eq!(rfm.spi.rx_buffer[0], Registers::IrqFlags1.read());
 
     rfm.spi.tx_buffer[0] = 0b1_0000000;
     rfm.spi.rx_buffer.clear();
-    rfm.wait_mode_ready().ok().unwrap();
+    assert!(rfm.is_mode_ready().ok().unwrap());
     assert_eq!(rfm.spi.rx_buffer[0], Registers::IrqFlags1.read());
 }
 
@@ -515,13 +504,13 @@ fn test_is_packet_ready() {
 }
 
 #[test]
-fn test_wait_packet_sent() {
+fn test_is_packet_sent() {
     let mut rfm = setup_rfm(Vec::new(), vec![0b0000_0_000, 0]);
-    rfm.wait_packet_sent().err().unwrap();
+    assert!(!rfm.is_packet_sent().ok().unwrap());
     assert_eq!(rfm.spi.rx_buffer[0], Registers::IrqFlags2.read());
 
     rfm.spi.tx_buffer[0] = 0b0000_1_000;
     rfm.spi.rx_buffer.clear();
-    rfm.wait_packet_sent().ok().unwrap();
+    assert!(rfm.is_packet_sent().ok().unwrap());
     assert_eq!(rfm.spi.rx_buffer[0], Registers::IrqFlags2.read());
 }

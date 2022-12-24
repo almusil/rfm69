@@ -1,6 +1,5 @@
 use core::convert::TryInto;
 
-use embedded_hal::blocking::delay::DelayMs;
 use embedded_hal::blocking::spi::Transactional;
 use embedded_hal::digital::v2::OutputPin;
 
@@ -24,40 +23,36 @@ macro_rules! _f_scale {
 }
 
 /// Main struct to interact with RFM69 chip.
-pub struct Rfm69<T, S, D> {
+pub struct Rfm69<T, S> {
     pub(crate) spi: S,
     cs: T,
-    delay: D,
     mode: Mode,
     dio: [Option<DioMapping>; 6],
     rssi: i16,
 }
 
-impl<S, D, Espi> Rfm69<NoCs, SpiTransactional<S>, D>
+impl<S, Espi> Rfm69<NoCs, SpiTransactional<S>>
 where
     S: Transactional<u8, Error = Espi>,
-    D: DelayMs<u8>,
 {
     /// Creates a new instance with everything set to default values after restart, and no explicit
     /// chip select line. This should be used when the chip select line is managed automatically by
     /// the [`Transactional`] implementation, such as when using `linux_embedded_hal`.
-    pub fn new_without_cs(spi: S, delay: D) -> Self {
-        Self::new(SpiTransactional(spi), NoCs, delay)
+    pub fn new_without_cs(spi: S) -> Self {
+        Self::new(SpiTransactional(spi), NoCs)
     }
 }
 
-impl<T, S, D, Ecs, Espi> Rfm69<T, S, D>
+impl<T, S, Ecs, Espi> Rfm69<T, S>
 where
     T: OutputPin<Error = Ecs>,
     S: ReadWrite<Error = Espi>,
-    D: DelayMs<u8>,
 {
     /// Creates a new instance with everything set to default values after restart.
-    pub fn new(spi: S, cs: T, delay: D) -> Self {
+    pub fn new(spi: S, cs: T) -> Self {
         Rfm69 {
             spi,
             cs,
-            delay,
             mode: Mode::Standby,
             dio: [None; 6],
             rssi: 0,
@@ -218,7 +213,6 @@ where
         }
 
         self.mode(Mode::Receiver)?;
-        self.wait_mode_ready()?;
 
         while !self.is_packet_ready()? {}
 
@@ -274,13 +268,14 @@ where
         }
 
         self.mode(Mode::Standby)?;
-        self.wait_mode_ready()?;
+        while !self.is_mode_ready()? {}
 
         self.reset_fifo()?;
 
         self.write_many(Registers::Fifo, buffer)?;
+
         self.mode(Mode::Transmitter)?;
-        self.wait_packet_sent()?;
+        while !self.is_packet_sent()? {}
 
         self.mode(Mode::Standby)
     }
@@ -296,7 +291,7 @@ where
         let packet_size: u8 = buffer.len().try_into().or(Err(Error::PacketTooLarge))?;
 
         self.mode(Mode::Standby)?;
-        self.wait_mode_ready()?;
+        while !self.is_mode_ready()? {}
 
         self.reset_fifo()?;
 
@@ -308,7 +303,7 @@ where
             self.write(Registers::Fifo, *b)?;
         }
 
-        self.wait_packet_sent()?;
+        while !self.is_packet_sent()? {}
 
         self.mode(Mode::Standby)
     }
@@ -331,6 +326,16 @@ where
     /// Check if IRQ flag PacketReady is set.
     pub fn is_packet_ready(&mut self) -> Result<bool, Ecs, Espi> {
         Ok(self.read(Registers::IrqFlags2)? & 0x04 != 0)
+    }
+
+    /// Check if IRQ flag ModeReady is set.
+    pub fn is_mode_ready(&mut self) -> Result<bool, Ecs, Espi> {
+        Ok((self.read(Registers::IrqFlags1)? & 0x80) != 0)
+    }
+
+    /// Check if IRQ flag PacketSent is set.
+    pub fn is_packet_sent(&mut self) -> Result<bool, Ecs, Espi> {
+        Ok((self.read(Registers::IrqFlags2)? & 0x08) != 0)
     }
 
     /// Configure LNA in corresponding register `RegLna (0x18)`.
@@ -410,18 +415,6 @@ where
         self.spi.read_many(reg, buffer).map_err(Error::Spi)
     }
 
-    pub(crate) fn wait_mode_ready(&mut self) -> Result<(), Ecs, Espi> {
-        self.with_timeout(100, 5, |rfm| {
-            Ok((rfm.read(Registers::IrqFlags1)? & 0x80) != 0)
-        })
-    }
-
-    pub(crate) fn wait_packet_sent(&mut self) -> Result<(), Ecs, Espi> {
-        self.with_timeout(100, 5, |rfm| {
-            Ok((rfm.read(Registers::IrqFlags2)? & 0x08) != 0)
-        })
-    }
-
     fn dio(&mut self) -> Result<(), Ecs, Espi> {
         let mut reg = 0x07;
         for mapping in self.dio.iter().flatten() {
@@ -438,23 +431,6 @@ where
 
     fn reset_fifo(&mut self) -> Result<(), Ecs, Espi> {
         self.write(Registers::IrqFlags2, 0x10)
-    }
-
-    fn with_timeout<F>(&mut self, timeout: u8, step: u8, func: F) -> Result<(), Ecs, Espi>
-    where
-        F: Fn(&mut Rfm69<T, S, D>) -> Result<bool, Ecs, Espi>,
-    {
-        let mut done = func(self)?;
-        let mut count = 0;
-        while !done && count < timeout {
-            self.delay.delay_ms(step);
-            count += step;
-            done = func(self)?;
-        }
-        if !done {
-            return Err(Error::Timeout);
-        }
-        Ok(())
     }
 
     fn update<F>(&mut self, reg: Registers, f: F) -> Result<(), Ecs, Espi>

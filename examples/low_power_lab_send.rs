@@ -1,7 +1,7 @@
 use anyhow::Result;
 use linux_embedded_hal::spidev::{SpiModeFlags, SpidevOptions};
 use linux_embedded_hal::sysfs_gpio::Direction;
-use linux_embedded_hal::{Delay, Spidev, SysfsPin};
+use linux_embedded_hal::{Spidev, SysfsPin};
 use rfm69::{low_power_lab_defaults, Rfm69};
 use utilities::{rfm_error, Packet};
 
@@ -22,7 +22,7 @@ fn main() -> Result<()> {
 
     // Create rfm struct with default compatible with LowPowerLabs
     let mut rfm = rfm_error!(low_power_lab_defaults(
-        Rfm69::new(spi, cs, Delay),
+        Rfm69::new(spi, cs),
         100,
         433_000_000
     ))?;
