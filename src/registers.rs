@@ -99,7 +99,7 @@ impl Registers {
     }
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum Mode {
     Sleep = 0x00,
     Standby = 0x04,
@@ -115,7 +115,7 @@ pub struct Modulation {
 
 impl Modulation {
     pub(crate) fn value(&self) -> u8 {
-        (*self).data_mode as u8 | (*self).modulation_type as u8 | (*self).shaping as u8
+        self.data_mode as u8 | self.modulation_type as u8 | self.shaping as u8
     }
 }
 
@@ -165,7 +165,7 @@ pub enum DioType {
     Dio11 = 0b11,
 }
 
-#[derive(PartialEq, Copy, Clone)]
+#[derive(PartialEq, Eq, Copy, Clone)]
 pub enum DioMode {
     Rx,
     Tx,
