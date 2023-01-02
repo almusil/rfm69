@@ -7,7 +7,7 @@ use crate::cs::{CsGuard, NoCs};
 use crate::error::{Error, Result};
 use crate::registers::{
     ContinuousDagc, DioMapping, DioPin, FifoMode, LnaConfig, Mode, Modulation, Pa13dBm1, Pa13dBm2,
-    PacketConfig, PacketFormat, Registers, RxBw, RxBwFreq, SensitivityBoost,
+    PacketConfig, PacketFormat, Registers, RxBw, RxBwFreq, SensitivityBoost, IrqFlags1, IrqFlags2,
 };
 use crate::rw::{ReadWrite, SpiTransactional};
 
@@ -327,32 +327,32 @@ where
 
     /// Check if IRQ flag SyncAddressMatch is set.
     pub fn is_sync_address_match(&mut self) -> Result<bool, Ecs, Espi> {
-        Ok(self.read(Registers::IrqFlags1)? & 0x01 != 0)
+        Ok(self.read(Registers::IrqFlags1)? & IrqFlags1::SyncAddressMatch != 0)
     }
 
     /// Check if IRQ flag FifoNotEmpty is cleared.
     pub fn is_fifo_empty(&mut self) -> Result<bool, Ecs, Espi> {
-        Ok(self.read(Registers::IrqFlags2)? & 0x40 == 0)
+        Ok(self.read(Registers::IrqFlags2)? & IrqFlags2::FifoNotEmpty == 0)
     }
 
     /// Check if IRQ flag FifoFull is set.
     pub fn is_fifo_full(&mut self) -> Result<bool, Ecs, Espi> {
-        Ok(self.read(Registers::IrqFlags2)? & 0x80 != 0)
+        Ok(self.read(Registers::IrqFlags2)? & IrqFlags2::FifoFull != 0)
     }
 
     /// Check if IRQ flag PacketReady is set.
     pub fn is_packet_ready(&mut self) -> Result<bool, Ecs, Espi> {
-        Ok(self.read(Registers::IrqFlags2)? & 0x04 != 0)
+        Ok(self.read(Registers::IrqFlags2)? & IrqFlags2::PayloadReady != 0)
     }
 
     /// Check if IRQ flag ModeReady is set.
     pub fn is_mode_ready(&mut self) -> Result<bool, Ecs, Espi> {
-        Ok((self.read(Registers::IrqFlags1)? & 0x80) != 0)
+        Ok((self.read(Registers::IrqFlags1)? & IrqFlags1::ModeReady) != 0)
     }
 
     /// Check if IRQ flag PacketSent is set.
     pub fn is_packet_sent(&mut self) -> Result<bool, Ecs, Espi> {
-        Ok((self.read(Registers::IrqFlags2)? & 0x08) != 0)
+        Ok((self.read(Registers::IrqFlags2)? & IrqFlags2::PacketSent) != 0)
     }
 
     /// Configure LNA in corresponding register `RegLna (0x18)`.
@@ -447,7 +447,7 @@ where
     }
 
     fn reset_fifo(&mut self) -> Result<(), Ecs, Espi> {
-        self.write(Registers::IrqFlags2, 0x10)
+        self.write(Registers::IrqFlags2, IrqFlags2::FifoOverrun as u8)
     }
 
     fn update<F>(&mut self, reg: Registers, f: F) -> Result<(), Ecs, Espi>
