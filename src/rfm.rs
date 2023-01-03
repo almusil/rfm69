@@ -6,7 +6,7 @@ use embedded_hal::digital::v2::OutputPin;
 use crate::cs::{CsGuard, NoCs};
 use crate::error::{Error, Result};
 use crate::registers::{
-    ContinuousDagc, DioMapping, DioPin, FifoMode,  IrqFlags1, IrqFlags2, LnaConfig, Mode,
+    ContinuousDagc, DioMapping, DioPin, FifoMode, IrqFlags1, IrqFlags2, LnaConfig, Mode,
     Modulation, Pa13dBm1, Pa13dBm2, PacketConfig, PacketFormat, Registers, RxBw, RxBwFreq,
     SensitivityBoost,
 };
