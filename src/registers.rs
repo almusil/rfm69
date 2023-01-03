@@ -420,7 +420,7 @@ pub enum IrqFlags1 {
     PllLock = 0x10,
     TxReady = 0x20,
     RxReady = 0x40,
-    ModeReady = 0x80
+    ModeReady = 0x80,
 }
 
 impl core::ops::BitAnd<IrqFlags1> for u8 {
@@ -438,7 +438,7 @@ pub enum IrqFlags2 {
     FifoOverrun = 0x10,
     FifoLevel = 0x20,
     FifoNotEmpty = 0x40,
-    FifoFull = 0x80
+    FifoFull = 0x80,
 }
 
 impl core::ops::BitAnd<IrqFlags2> for u8 {
