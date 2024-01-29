@@ -1,9 +1,7 @@
-pub(crate) type Result<T, Ecs, Espi> = core::result::Result<T, Error<Ecs, Espi>>;
+pub(crate) type Result<T, Espi> = core::result::Result<T, Error<Espi>>;
 
 #[derive(Debug)]
-pub enum Error<Ecs, Espi> {
-    /// Chip select pin error
-    Cs(Ecs),
+pub enum Error<Espi> {
     /// SPI bus error
     Spi(Espi),
     /// Timeout exceeded

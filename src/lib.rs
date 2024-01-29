@@ -27,13 +27,11 @@
 
 #![cfg_attr(not(test), no_std)]
 
-pub use crate::cs::NoCs;
 pub use crate::defaults::low_power_lab_defaults;
 pub use crate::error::Error;
 pub use crate::rfm::Rfm69;
-pub use crate::rw::{ReadWrite, SpiTransactional};
+pub use crate::rw::ReadWrite;
 
-mod cs;
 mod defaults;
 mod error;
 mod rfm;

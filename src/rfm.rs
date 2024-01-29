@@ -1,16 +1,12 @@
 use core::convert::TryInto;
 
-use embedded_hal::blocking::spi::Transactional;
-use embedded_hal::digital::v2::OutputPin;
-
-use crate::cs::{CsGuard, NoCs};
 use crate::error::{Error, Result};
 use crate::registers::{
     ContinuousDagc, DioMapping, DioPin, FifoMode, IrqFlags1, IrqFlags2, LnaConfig, Mode,
     Modulation, Pa13dBm1, Pa13dBm2, PacketConfig, PacketFormat, Registers, RxBw, RxBwFreq,
     SensitivityBoost,
 };
-use crate::rw::{ReadWrite, SpiTransactional};
+use crate::rw::ReadWrite;
 
 // 1_000_000 larger for better precision.
 const F_SCALE: u64 = 1_000_000;
@@ -24,36 +20,21 @@ macro_rules! _f_scale {
 }
 
 /// Main struct to interact with RFM69 chip.
-pub struct Rfm69<T, S> {
+pub struct Rfm69<S> {
     pub(crate) spi: S,
-    cs: T,
     mode: Mode,
     dio: [Option<DioMapping>; 6],
     rssi: i16,
 }
 
-impl<S, Espi> Rfm69<NoCs, SpiTransactional<S>>
+impl<S, Espi> Rfm69<S>
 where
-    S: Transactional<u8, Error = Espi>,
-{
-    /// Creates a new instance with everything set to default values after restart, and no explicit
-    /// chip select line. This should be used when the chip select line is managed automatically by
-    /// the [`Transactional`] implementation, such as when using `linux_embedded_hal`.
-    pub fn new_without_cs(spi: S) -> Self {
-        Self::new(SpiTransactional(spi), NoCs)
-    }
-}
-
-impl<T, S, Ecs, Espi> Rfm69<T, S>
-where
-    T: OutputPin<Error = Ecs>,
     S: ReadWrite<Error = Espi>,
 {
     /// Creates a new instance with everything set to default values after restart.
-    pub fn new(spi: S, cs: T) -> Self {
+    pub fn new(spi: S) -> Self {
         Rfm69 {
             spi,
-            cs,
             mode: Mode::Standby,
             dio: [None; 6],
             rssi: 0,
@@ -61,14 +42,14 @@ where
     }
 
     /// Reads content of all registers that are available.
-    pub fn read_all_regs(&mut self) -> Result<[u8; 0x4f], Ecs, Espi> {
+    pub fn read_all_regs(&mut self) -> Result<[u8; 0x4f], Espi> {
         let mut buffer = [0u8; 0x4f];
         self.read_many(Registers::OpMode, &mut buffer)?;
         Ok(buffer)
     }
 
     /// Sets the mode in corresponding register `RegOpMode (0x01)`.
-    pub fn mode(&mut self, mode: Mode) -> Result<(), Ecs, Espi> {
+    pub fn mode(&mut self, mode: Mode) -> Result<(), Espi> {
         if self.mode == mode {
             return Ok(());
         }
@@ -79,34 +60,34 @@ where
     }
 
     /// Sets the modulation in corresponding register `RegDataModul (0x02)`.
-    pub fn modulation(&mut self, modulation: Modulation) -> Result<(), Ecs, Espi> {
+    pub fn modulation(&mut self, modulation: Modulation) -> Result<(), Espi> {
         self.write(Registers::DataModul, modulation.value())
     }
 
     /// Computes the bitrate, according to `Fosc / bit_rate` and stores it in
     /// `RegBitrateMsb (0x03), RegBitrateLsb (0x04)`.
-    pub fn bit_rate(&mut self, bit_rate: u32) -> Result<(), Ecs, Espi> {
+    pub fn bit_rate(&mut self, bit_rate: u32) -> Result<(), Espi> {
         let reg = (FOSC / _f_scale!(bit_rate)) as u16;
         self.write_many(Registers::BitrateMsb, &reg.to_be_bytes())
     }
 
     /// Computes the frequency deviation, according to `fdev / Fstep` and stores it in
     /// `RegFdevMsb (0x05), RegFdevLsb (0x06)`.
-    pub fn fdev(&mut self, fdev: u32) -> Result<(), Ecs, Espi> {
+    pub fn fdev(&mut self, fdev: u32) -> Result<(), Espi> {
         let reg = (_f_scale!(fdev) / FSTEP) as u16;
         self.write_many(Registers::FdevMsb, &reg.to_be_bytes())
     }
 
     /// Computes the radio frequency, according to `frequency / Fstep` and stores it in
     /// `RegFrfMsb (0x07), RegFrfMid (0x08), RegFrfLsb (0x09)`.
-    pub fn frequency(&mut self, frequency: u32) -> Result<(), Ecs, Espi> {
+    pub fn frequency(&mut self, frequency: u32) -> Result<(), Espi> {
         let reg = (_f_scale!(frequency) / FSTEP) as u32;
         self.write_many(Registers::FrfMsb, &reg.to_be_bytes()[1..])
     }
 
     /// Stores DIO mapping for different RFM69 modes. For DIO behavior between modes
     /// please refer to the corresponding table in RFM69 datasheet.
-    pub fn dio_mapping(&mut self, mapping: DioMapping) -> Result<(), Ecs, Espi> {
+    pub fn dio_mapping(&mut self, mapping: DioMapping) -> Result<(), Espi> {
         let pin = mapping.pin;
         let dio = Some(mapping);
         match pin {
@@ -121,7 +102,7 @@ where
     }
 
     /// Clears stored DIO mapping for specified pin.
-    pub fn clear_dio(&mut self, pin: DioPin) -> Result<(), Ecs, Espi> {
+    pub fn clear_dio(&mut self, pin: DioPin) -> Result<(), Espi> {
         match pin {
             DioPin::Dio0 => self.dio[0] = None,
             DioPin::Dio1 => self.dio[1] = None,
@@ -135,13 +116,13 @@ where
 
     /// Sets preamble length in corresponding registers `RegPreambleMsb (0x2C),
     /// RegPreambleLsb (0x2D)`.
-    pub fn preamble(&mut self, reg: u16) -> Result<(), Ecs, Espi> {
+    pub fn preamble(&mut self, reg: u16) -> Result<(), Espi> {
         self.write_many(Registers::PreambleMsb, &reg.to_be_bytes())
     }
 
     /// Sets sync config and sync words in `RegSyncConfig (0x2E), RegSyncValue1-8(0x2F-0x36)`.
     /// Maximal sync length is 8, pass empty buffer to clear the sync flag.
-    pub fn sync(&mut self, sync: &[u8]) -> Result<(), Ecs, Espi> {
+    pub fn sync(&mut self, sync: &[u8]) -> Result<(), Espi> {
         let len = sync.len();
         if len == 0 {
             return self.update(Registers::SyncConfig, |r| r & 0x7f);
@@ -155,7 +136,7 @@ where
 
     /// Sets packet settings in corresponding registers `RegPacketConfig1 (0x37),
     /// RegPayloadLength (0x38), RegPacketConfig2 (0x3D)`.
-    pub fn packet(&mut self, packet_config: PacketConfig) -> Result<(), Ecs, Espi> {
+    pub fn packet(&mut self, packet_config: PacketConfig) -> Result<(), Espi> {
         let len: u8;
         let mut reg = 0x00;
         match packet_config.format {
@@ -173,17 +154,17 @@ where
     }
 
     /// Sets node address in corresponding register `RegNodeAdrs (0x39)`.
-    pub fn node_address(&mut self, a: u8) -> Result<(), Ecs, Espi> {
+    pub fn node_address(&mut self, a: u8) -> Result<(), Espi> {
         self.write(Registers::NodeAddrs, a)
     }
 
     /// Sets broadcast address in corresponding register `RegBroadcastAdrs (0x3A)`.
-    pub fn broadcast_address(&mut self, a: u8) -> Result<(), Ecs, Espi> {
+    pub fn broadcast_address(&mut self, a: u8) -> Result<(), Espi> {
         self.write(Registers::BroadcastAddrs, a)
     }
 
     /// Sets FIFO mode in corresponding register `RegFifoThresh (0x3C)`.
-    pub fn fifo_mode(&mut self, mode: FifoMode) -> Result<(), Ecs, Espi> {
+    pub fn fifo_mode(&mut self, mode: FifoMode) -> Result<(), Espi> {
         match mode {
             FifoMode::NotEmpty => self.update(Registers::FifoThresh, |r| r | 0x80),
             FifoMode::Level(level) => self.write(Registers::FifoThresh, level & 0x7f),
@@ -193,7 +174,7 @@ where
     /// Sets AES encryption in corresponding registers `RegPacketConfig2 (0x3D),
     /// RegAesKey1-16 (0x3E-0x4D)`. The key must be 16 bytes long, pass empty buffer to disable
     /// the AES encryption.
-    pub fn aes(&mut self, key: &[u8]) -> Result<(), Ecs, Espi> {
+    pub fn aes(&mut self, key: &[u8]) -> Result<(), Espi> {
         let len = key.len();
         if len == 0 {
             return self.update(Registers::PacketConfig2, |r| r & 0xfe);
@@ -225,7 +206,7 @@ where
     /// }
     ///
     /// ```
-    pub fn recv(&mut self, buffer: &mut [u8]) -> Result<(), Ecs, Espi> {
+    pub fn recv(&mut self, buffer: &mut [u8]) -> Result<(), Espi> {
         if buffer.is_empty() {
             return Ok(());
         }
@@ -252,7 +233,7 @@ where
     ///
     /// ## Note
     /// This function does not detect FIFO overruns.
-    pub fn recv_large(&mut self, buffer: &mut [u8]) -> Result<usize, Ecs, Espi> {
+    pub fn recv_large(&mut self, buffer: &mut [u8]) -> Result<usize, Espi> {
         self.mode(Mode::Receiver)?;
 
         while self.is_fifo_empty()? {}
@@ -280,7 +261,7 @@ where
     }
 
     /// Send bytes to another RFM69. This can block until all data are sent.
-    pub fn send(&mut self, buffer: &[u8]) -> Result<(), Ecs, Espi> {
+    pub fn send(&mut self, buffer: &[u8]) -> Result<(), Espi> {
         if buffer.is_empty() {
             return Ok(());
         }
@@ -305,7 +286,7 @@ where
     ///
     /// ## Note
     /// This function does not detect FIFO underruns.
-    pub fn send_large(&mut self, buffer: &[u8]) -> Result<(), Ecs, Espi> {
+    pub fn send_large(&mut self, buffer: &[u8]) -> Result<(), Espi> {
         let packet_size: u8 = buffer.len().try_into().or(Err(Error::PacketTooLarge))?;
 
         self.mode(Mode::Standby)?;
@@ -327,68 +308,68 @@ where
     }
 
     /// Check if IRQ flag SyncAddressMatch is set.
-    pub fn is_sync_address_match(&mut self) -> Result<bool, Ecs, Espi> {
+    pub fn is_sync_address_match(&mut self) -> Result<bool, Espi> {
         Ok(self.read(Registers::IrqFlags1)? & IrqFlags1::SyncAddressMatch != 0)
     }
 
     /// Check if IRQ flag FifoNotEmpty is cleared.
-    pub fn is_fifo_empty(&mut self) -> Result<bool, Ecs, Espi> {
+    pub fn is_fifo_empty(&mut self) -> Result<bool, Espi> {
         Ok(self.read(Registers::IrqFlags2)? & IrqFlags2::FifoNotEmpty == 0)
     }
 
     /// Check if IRQ flag FifoFull is set.
-    pub fn is_fifo_full(&mut self) -> Result<bool, Ecs, Espi> {
+    pub fn is_fifo_full(&mut self) -> Result<bool, Espi> {
         Ok(self.read(Registers::IrqFlags2)? & IrqFlags2::FifoFull != 0)
     }
 
     /// Check if IRQ flag PacketReady is set.
-    pub fn is_packet_ready(&mut self) -> Result<bool, Ecs, Espi> {
+    pub fn is_packet_ready(&mut self) -> Result<bool, Espi> {
         Ok(self.read(Registers::IrqFlags2)? & IrqFlags2::PayloadReady != 0)
     }
 
     /// Check if IRQ flag ModeReady is set.
-    pub fn is_mode_ready(&mut self) -> Result<bool, Ecs, Espi> {
+    pub fn is_mode_ready(&mut self) -> Result<bool, Espi> {
         Ok((self.read(Registers::IrqFlags1)? & IrqFlags1::ModeReady) != 0)
     }
 
     /// Check if IRQ flag PacketSent is set.
-    pub fn is_packet_sent(&mut self) -> Result<bool, Ecs, Espi> {
+    pub fn is_packet_sent(&mut self) -> Result<bool, Espi> {
         Ok((self.read(Registers::IrqFlags2)? & IrqFlags2::PacketSent) != 0)
     }
 
     /// Configure LNA in corresponding register `RegLna (0x18)`.
-    pub fn lna(&mut self, lna: LnaConfig) -> Result<(), Ecs, Espi> {
+    pub fn lna(&mut self, lna: LnaConfig) -> Result<(), Espi> {
         let reg = (lna.zin as u8) | (lna.gain_select as u8);
         self.update(Registers::Lna, |r| (r & 0x78) | reg)
     }
 
     /// Configure RSSI Threshold in corresponding register `RegRssiThresh (0x29)`.
-    pub fn rssi_threshold(&mut self, threshold: u8) -> Result<(), Ecs, Espi> {
+    pub fn rssi_threshold(&mut self, threshold: u8) -> Result<(), Espi> {
         self.write(Registers::RssiThresh, threshold)
     }
 
     /// Configure Sensitivity Boost in corresponding register `RegTestLna (0x58)`.
-    pub fn sensitivity_boost(&mut self, boost: SensitivityBoost) -> Result<(), Ecs, Espi> {
+    pub fn sensitivity_boost(&mut self, boost: SensitivityBoost) -> Result<(), Espi> {
         self.write(Registers::TestLna, boost as u8)
     }
 
     /// Configure Pa13 dBm 1 in corresponding register `RegTestPa1 (0x5A)`.
-    pub fn pa13_dbm1(&mut self, pa13: Pa13dBm1) -> Result<(), Ecs, Espi> {
+    pub fn pa13_dbm1(&mut self, pa13: Pa13dBm1) -> Result<(), Espi> {
         self.write(Registers::TestPa1, pa13 as u8)
     }
 
     /// Configure Pa13 dBm 2 in corresponding register `RegTestPa2 (0x5C)`.
-    pub fn pa13_dbm2(&mut self, pa13: Pa13dBm2) -> Result<(), Ecs, Espi> {
+    pub fn pa13_dbm2(&mut self, pa13: Pa13dBm2) -> Result<(), Espi> {
         self.write(Registers::TestPa2, pa13 as u8)
     }
 
     /// Configure Continuous Dagc in corresponding register `RegTestDagc (0x6F)`.
-    pub fn continuous_dagc(&mut self, cdagc: ContinuousDagc) -> Result<(), Ecs, Espi> {
+    pub fn continuous_dagc(&mut self, cdagc: ContinuousDagc) -> Result<(), Espi> {
         self.write(Registers::TestDagc, cdagc as u8)
     }
 
     /// Configure Rx Bandwidth in corresponding register `RegRxBw (0x19)`.
-    pub fn rx_bw<RxBwT>(&mut self, rx_bw: RxBw<RxBwT>) -> Result<(), Ecs, Espi>
+    pub fn rx_bw<RxBwT>(&mut self, rx_bw: RxBw<RxBwT>) -> Result<(), Espi>
     where
         RxBwT: RxBwFreq,
     {
@@ -399,7 +380,7 @@ where
     }
 
     /// Configure Rx AFC Bandwidth in corresponding register `RegAfcBw (0x1A)`.
-    pub fn rx_afc_bw<RxBwT>(&mut self, rx_bw: RxBw<RxBwT>) -> Result<(), Ecs, Espi>
+    pub fn rx_afc_bw<RxBwT>(&mut self, rx_bw: RxBw<RxBwT>) -> Result<(), Espi>
     where
         RxBwT: RxBwFreq,
     {
@@ -410,30 +391,28 @@ where
     }
 
     /// Direct write to RFM69 registers.
-    pub fn write(&mut self, reg: Registers, val: u8) -> Result<(), Ecs, Espi> {
+    pub fn write(&mut self, reg: Registers, val: u8) -> Result<(), Espi> {
         self.write_many(reg, &[val])
     }
 
     /// Direct write to RFM69 registers.
-    pub fn write_many(&mut self, reg: Registers, data: &[u8]) -> Result<(), Ecs, Espi> {
-        let _guard = CsGuard::new(&mut self.cs)?;
+    pub fn write_many(&mut self, reg: Registers, data: &[u8]) -> Result<(), Espi> {
         self.spi.write_many(reg, data).map_err(Error::Spi)
     }
 
     /// Direct read from RFM69 registers.
-    pub fn read(&mut self, reg: Registers) -> Result<u8, Ecs, Espi> {
+    pub fn read(&mut self, reg: Registers) -> Result<u8, Espi> {
         let mut buffer = [0u8; 1];
         self.read_many(reg, &mut buffer)?;
         Ok(buffer[0])
     }
 
     /// Direct read from RFM69 registers.
-    pub fn read_many(&mut self, reg: Registers, buffer: &mut [u8]) -> Result<(), Ecs, Espi> {
-        let _guard = CsGuard::new(&mut self.cs)?;
+    pub fn read_many(&mut self, reg: Registers, buffer: &mut [u8]) -> Result<(), Espi> {
         self.spi.read_many(reg, buffer).map_err(Error::Spi)
     }
 
-    fn dio(&mut self) -> Result<(), Ecs, Espi> {
+    fn dio(&mut self) -> Result<(), Espi> {
         let mut reg = 0x07;
         for mapping in self.dio.iter().flatten() {
             if mapping.dio_mode.eq(self.mode) {
@@ -443,15 +422,15 @@ where
         self.write_many(Registers::DioMapping1, &reg.to_be_bytes())
     }
 
-    fn read_rssi(&mut self) -> Result<i16, Ecs, Espi> {
+    fn read_rssi(&mut self) -> Result<i16, Espi> {
         Ok(-i16::from(self.read(Registers::RssiValue)?) >> 1)
     }
 
-    fn reset_fifo(&mut self) -> Result<(), Ecs, Espi> {
+    fn reset_fifo(&mut self) -> Result<(), Espi> {
         self.write(Registers::IrqFlags2, IrqFlags2::FifoOverrun as u8)
     }
 
-    fn update<F>(&mut self, reg: Registers, f: F) -> Result<(), Ecs, Espi>
+    fn update<F>(&mut self, reg: Registers, f: F) -> Result<(), Espi>
     where
         F: FnOnce(u8) -> u8,
     {

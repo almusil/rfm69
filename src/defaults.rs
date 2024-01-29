@@ -1,5 +1,3 @@
-use embedded_hal::digital::v2::OutputPin;
-
 use crate::error::Result;
 use crate::registers::{
     ContinuousDagc, DataMode, DccCutoff, FifoMode, InterPacketRxDelay, LnaConfig, LnaGain,
@@ -11,13 +9,12 @@ use crate::Rfm69;
 
 /// Configures RFM69 according to [LowPowerLab](https://github.com/LowPowerLab/RFM69) Arduino
 /// library
-pub fn low_power_lab_defaults<T, S, Ecs, Espi>(
-    mut rfm: Rfm69<T, S>,
+pub fn low_power_lab_defaults<S, Espi>(
+    mut rfm: Rfm69<S>,
     network_id: u8,
     frequency: u32,
-) -> Result<Rfm69<T, S>, Ecs, Espi>
+) -> Result<Rfm69<S>, Espi>
 where
-    T: OutputPin<Error = Ecs>,
     S: ReadWrite<Error = Espi>,
 {
     rfm.mode(Mode::Standby)?;

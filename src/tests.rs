@@ -1,8 +1,10 @@
 #![allow(clippy::unusual_byte_groupings)]
 
+use core::convert::Infallible;
+use core::iter::repeat;
 use std::prelude::v1::*;
 
-use embedded_hal::blocking::spi::{Operation, Transactional, Transfer, Write};
+use embedded_hal::spi::{ErrorType, Operation, SpiDevice};
 
 use crate::registers::*;
 use crate::*;
@@ -12,54 +14,50 @@ struct SpiMock {
     tx_buffer: Vec<u8>,
 }
 
-impl Transfer<u8> for SpiMock {
-    type Error = ();
-
-    fn transfer<'w>(&mut self, words: &'w mut [u8]) -> std::result::Result<&'w [u8], Self::Error> {
-        self.rx_buffer.extend_from_slice(words);
-        for (index, val) in words.iter_mut().enumerate() {
-            *val = self.tx_buffer[index];
-        }
-        Ok(words)
-    }
+impl ErrorType for SpiMock {
+    type Error = Infallible;
 }
 
-impl Write<u8> for SpiMock {
-    type Error = ();
-
-    fn write(&mut self, words: &[u8]) -> std::result::Result<(), Self::Error> {
-        self.rx_buffer.extend_from_slice(words);
-        Ok(())
-    }
-}
-
-impl Transactional<u8> for SpiMock {
-    type Error = ();
-
-    fn exec<'a>(
+impl SpiDevice for SpiMock {
+    fn transaction(
         &mut self,
-        operations: &mut [Operation<'a, u8>],
+        operations: &mut [Operation<u8>],
     ) -> std::result::Result<(), Self::Error> {
         for operation in operations {
             match operation {
-                Operation::Write(buffer) => self.write(buffer)?,
-                Operation::Transfer(buffer) => {
-                    self.transfer(buffer)?;
+                Operation::Read(buffer) => {
+                    self.rx_buffer.extend(repeat(0xff).take(buffer.len()));
+                    for (index, val) in buffer.iter_mut().enumerate() {
+                        *val = self.tx_buffer[index];
+                    }
                 }
+                Operation::Write(buffer) => {
+                    self.rx_buffer.extend_from_slice(buffer);
+                }
+                Operation::Transfer(rx_buffer, tx_buffer) => {
+                    self.rx_buffer.extend_from_slice(tx_buffer);
+                    for (index, val) in rx_buffer.iter_mut().enumerate() {
+                        *val = self.tx_buffer[index];
+                    }
+                }
+                Operation::TransferInPlace(buffer) => {
+                    self.rx_buffer.extend_from_slice(buffer);
+                    for (index, val) in buffer.iter_mut().enumerate() {
+                        *val = self.tx_buffer[index];
+                    }
+                }
+                Operation::DelayNs(_) => {}
             }
         }
         Ok(())
     }
 }
 
-fn setup_rfm(rx_buffer: Vec<u8>, tx_buffer: Vec<u8>) -> Rfm69<NoCs, SpiMock> {
-    Rfm69::new(
-        SpiMock {
-            rx_buffer,
-            tx_buffer,
-        },
-        NoCs,
-    )
+fn setup_rfm(rx_buffer: Vec<u8>, tx_buffer: Vec<u8>) -> Rfm69<SpiMock> {
+    Rfm69::new(SpiMock {
+        rx_buffer,
+        tx_buffer,
+    })
 }
 
 #[test]
@@ -69,18 +67,6 @@ fn test_read_all_regs() {
     let result = rfm.read_all_regs().unwrap_or([0; 0x4f]);
     assert_eq!(rfm.spi.rx_buffer[0], Registers::OpMode.read());
     assert_eq!(result.as_ref(), rfm.spi.tx_buffer.as_slice());
-}
-
-#[test]
-fn test_read_all_regs_transactional() {
-    let mut rfm = Rfm69::new_without_cs(SpiMock {
-        rx_buffer: Vec::new(),
-        tx_buffer: (1..=0x4f).collect(),
-    });
-
-    let result = rfm.read_all_regs().unwrap_or([0; 0x4f]);
-    assert_eq!(rfm.spi.0.rx_buffer[0], Registers::OpMode.read());
-    assert_eq!(result.as_ref(), rfm.spi.0.tx_buffer.as_slice());
 }
 
 #[test]

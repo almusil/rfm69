@@ -12,9 +12,10 @@ description = "A generic rust driver to support RFM69 family wireless chips"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-embedded-hal = "0.2"
+embedded-hal = "1.0.0"
 
 [dev-dependencies]
 anyhow = "1.0"
-linux-embedded-hal = "^0.3.2"
+embedded-hal-bus = { version = "0.1.0", features = ["std"] }
+linux-embedded-hal = "0.4.0"
 utilities = { path = "utilities" }
