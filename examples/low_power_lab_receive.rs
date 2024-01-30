@@ -1,7 +1,8 @@
 use anyhow::Result;
+use embedded_hal_bus::spi::ExclusiveDevice;
 use linux_embedded_hal::spidev::{SpiModeFlags, SpidevOptions};
 use linux_embedded_hal::sysfs_gpio::Direction;
-use linux_embedded_hal::{Spidev, SysfsPin};
+use linux_embedded_hal::{Delay, SpidevBus, SysfsPin};
 use rfm69::{low_power_lab_defaults, Rfm69};
 use utilities::{rfm_error, Packet};
 
@@ -12,20 +13,18 @@ fn main() -> Result<()> {
     cs.set_direction(Direction::High)?;
 
     // Configure SPI 8 bits, Mode 0
-    let mut spi = Spidev::open("/dev/spidev0.0")?;
+    let mut spi_bus = SpidevBus::open("/dev/spidev0.0")?;
     let options = SpidevOptions::new()
         .bits_per_word(8)
         .max_speed_hz(1_000_000)
         .mode(SpiModeFlags::SPI_MODE_0)
         .build();
-    spi.configure(&options)?;
+    spi_bus.configure(&options)?;
+
+    let spi = ExclusiveDevice::new(spi_bus, cs, Delay);
 
     // Create rfm struct with default compatible with LowPowerLabs
-    let mut rfm = rfm_error!(low_power_lab_defaults(
-        Rfm69::new(spi, cs),
-        100,
-        433_000_000
-    ))?;
+    let mut rfm = rfm_error!(low_power_lab_defaults(Rfm69::new(spi), 100, 433_000_000))?;
 
     // Print content of all RFM registers
     for (index, val) in rfm_error!(rfm.read_all_regs())?.iter().enumerate() {

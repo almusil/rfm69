@@ -1,18 +1,12 @@
 use anyhow::Result;
 use linux_embedded_hal::spidev::{SpiModeFlags, SpidevOptions};
-use linux_embedded_hal::sysfs_gpio::Direction;
-use linux_embedded_hal::{Spidev, SysfsPin};
+use linux_embedded_hal::SpidevDevice;
 use rfm69::Rfm69;
 use utilities::rfm_error;
 
 fn main() -> Result<()> {
-    // Configure CS pin
-    let cs = SysfsPin::new(25);
-    cs.export()?;
-    cs.set_direction(Direction::High)?;
-
     // Configure SPI 8 bits, Mode 0
-    let mut spi = Spidev::open("/dev/spidev0.0")?;
+    let mut spi = SpidevDevice::open("/dev/spidev0.0")?;
     let options = SpidevOptions::new()
         .bits_per_word(8)
         .max_speed_hz(1_000_000)
@@ -21,7 +15,7 @@ fn main() -> Result<()> {
     spi.configure(&options)?;
 
     // Create rfm struct with defaults that are set after reset
-    let mut rfm = Rfm69::new(spi, cs);
+    let mut rfm = Rfm69::new(spi);
 
     // Print content of all RFM registers
     for (index, val) in rfm_error!(rfm.read_all_regs())?.iter().enumerate() {
@@ -31,9 +25,6 @@ fn main() -> Result<()> {
     // Send a packet
     let buffer = Vec::from(b"Hello, world!".as_ref());
     rfm_error!(rfm.send(&buffer))?;
-
-    // Un-export the CS pin
-    SysfsPin::new(25).unexport()?;
 
     Ok(())
 }
