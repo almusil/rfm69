@@ -1,6 +1,6 @@
 use anyhow::Result;
 use linux_embedded_hal::spidev::{SpiModeFlags, SpidevOptions};
-use linux_embedded_hal::{SpidevDevice, SysfsPin};
+use linux_embedded_hal::SpidevDevice;
 use rfm69::Rfm69;
 use utilities::rfm_error;
 
@@ -29,9 +29,6 @@ fn main() -> Result<()> {
     for (index, val) in buffer.iter().enumerate() {
         println!("Value at {} = {}", index, val)
     }
-
-    // Un-export the CS pin
-    SysfsPin::new(25).unexport()?;
 
     Ok(())
 }

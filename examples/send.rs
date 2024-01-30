@@ -1,6 +1,6 @@
 use anyhow::Result;
 use linux_embedded_hal::spidev::{SpiModeFlags, SpidevOptions};
-use linux_embedded_hal::{SpidevDevice, SysfsPin};
+use linux_embedded_hal::SpidevDevice;
 use rfm69::Rfm69;
 use utilities::rfm_error;
 
@@ -25,9 +25,6 @@ fn main() -> Result<()> {
     // Send a packet
     let buffer = Vec::from(b"Hello, world!".as_ref());
     rfm_error!(rfm.send(&buffer))?;
-
-    // Un-export the CS pin
-    SysfsPin::new(25).unexport()?;
 
     Ok(())
 }
