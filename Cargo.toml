@@ -19,3 +19,7 @@ anyhow = "1.0"
 embedded-hal-bus = { version = "0.1.0", features = ["std"] }
 linux-embedded-hal = "0.4.0"
 utilities = { path = "utilities" }
+
+[features]
+default = []
+std = []
