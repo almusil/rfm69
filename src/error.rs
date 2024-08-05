@@ -1,6 +1,6 @@
 pub(crate) type Result<T, Espi> = core::result::Result<T, Error<Espi>>;
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Error<Espi> {
     /// SPI bus error
     Spi(Espi),
