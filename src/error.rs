@@ -1,4 +1,4 @@
-use core::fmt::{self, Display, Formatter};
+use core::fmt::{self, Debug, Display, Formatter};
 
 pub(crate) type Result<T, Espi> = core::result::Result<T, Error<Espi>>;
 
@@ -30,3 +30,6 @@ impl<Espi: Display> Display for Error<Espi> {
         }
     }
 }
+
+#[cfg(feature = "std")]
+impl<Espi: Display + Debug> std::error::Error for Error<Espi> {}

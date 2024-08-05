@@ -25,7 +25,7 @@
 //! - [Product page](https://www.hoperf.com/modules/rf_transceiver/RFM69HCW.html)
 //! - [Datasheet](https://www.hoperf.com/data/upload/portal/20190307/RFM69HCW-V1.1.pdf)
 
-#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(any(test, feature = "std")), no_std)]
 
 pub use crate::defaults::low_power_lab_defaults;
 pub use crate::error::Error;
