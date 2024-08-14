@@ -3,8 +3,8 @@ use core::convert::TryInto;
 use crate::error::{Error, Result};
 use crate::registers::{
     ContinuousDagc, DioMapping, DioPin, FifoMode, IrqFlags1, IrqFlags2, LnaConfig, Mode,
-    Modulation, Pa13dBm1, Pa13dBm2, PacketConfig, PacketFormat, Registers, RxBw, RxBwFreq,
-    SensitivityBoost,
+    Modulation, Pa13dBm1, Pa13dBm2, PaOptions, PacketConfig, PacketFormat, Registers, RxBw,
+    RxBwFreq, SensitivityBoost,
 };
 use crate::rw::ReadWrite;
 
@@ -25,6 +25,7 @@ pub struct Rfm69<S> {
     mode: Mode,
     dio: [Option<DioMapping>; 6],
     rssi: i16,
+    tx_pwr: i8,
 }
 
 impl<S, Espi> Rfm69<S>
@@ -38,6 +39,7 @@ where
             mode: Mode::Standby,
             dio: [None; 6],
             rssi: 0,
+            tx_pwr: 0,
         }
     }
 
@@ -271,10 +273,20 @@ where
 
         self.reset_fifo()?;
 
+        // If the trasnmit power is over 18, turn on boost mode
+        if self.tx_pwr >= 18 {
+            self.enable_boost_mode()?;
+        }
+
         self.write_many(Registers::Fifo, buffer)?;
 
         self.mode(Mode::Transmitter)?;
         while !self.is_packet_sent()? {}
+
+        // If the trasnmit power is over 18, turn off boost mode after sending message
+        if self.tx_pwr >= 18 {
+            self.disable_boost_mode()?;
+        }
 
         self.mode(Mode::Standby)
     }
@@ -295,6 +307,12 @@ where
         self.reset_fifo()?;
 
         self.write(Registers::Fifo, packet_size)?;
+
+        // If the trasnmit power is over 18, turn on boost mode
+        if self.tx_pwr >= 18 {
+            self.enable_boost_mode()?;
+        }
+
         self.mode(Mode::Transmitter)?;
 
         for b in buffer {
@@ -303,6 +321,11 @@ where
         }
 
         while !self.is_packet_sent()? {}
+
+        // If the trasnmit power is over 18, turn off boost mode after sending message
+        if self.tx_pwr >= 18 {
+            self.disable_boost_mode()?;
+        }
 
         self.mode(Mode::Standby)
     }
@@ -351,6 +374,46 @@ where
     /// Configure Sensitivity Boost in corresponding register `RegTestLna (0x58)`.
     pub fn sensitivity_boost(&mut self, boost: SensitivityBoost) -> Result<(), Espi> {
         self.write(Registers::TestLna, boost as u8)
+    }
+
+    pub fn tx_level(&mut self, power_level: i8) -> Result<(), Espi> {
+        let adjusted_power = power_level.clamp(-18, 13);
+
+        let reg_value = PaOptions::Pa0On as u8 | (adjusted_power + 18) as u8;
+
+        self.write(Registers::PaLevel, reg_value)?;
+        self.tx_pwr = adjusted_power;
+        Ok(())
+    }
+
+    pub fn tx_level_high_pwr(&mut self, power_level: i8) -> Result<(), Espi> {
+        let adjusted_power = power_level.clamp(-2, 20);
+
+        let reg_value = match adjusted_power {
+            p if p <= 13 => PaOptions::Pa1On as u8 | (adjusted_power + 18) as u8,
+            p if p >= 18 => {
+                (PaOptions::Pa1On as u8 | PaOptions::Pa2On as u8) | (adjusted_power + 11) as u8
+            }
+            _ => (PaOptions::Pa1On as u8 | PaOptions::Pa2On as u8) | (adjusted_power + 14) as u8,
+        };
+
+        self.write(Registers::PaLevel, reg_value)?;
+        self.tx_pwr = adjusted_power;
+        Ok(())
+    }
+
+    fn enable_boost_mode(&mut self) -> Result<(), Espi> {
+        self.write(Registers::Ocp, 0x0F)?;
+        self.write(Registers::TestPa1, 0x5D)?;
+        self.write(Registers::TestPa2, 0x7C)?;
+        Ok(())
+    }
+
+    fn disable_boost_mode(&mut self) -> Result<(), Espi> {
+        self.write(Registers::Ocp, 0x1A)?;
+        self.write(Registers::TestPa1, 0x55)?;
+        self.write(Registers::TestPa2, 0x70)?;
+        Ok(())
     }
 
     /// Configure Pa13 dBm 1 in corresponding register `RegTestPa1 (0x5A)`.

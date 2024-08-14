@@ -500,3 +500,51 @@ fn test_is_packet_sent() {
     assert!(rfm.is_packet_sent().ok().unwrap());
     assert_eq!(rfm.spi.rx_buffer[0], Registers::IrqFlags2.read());
 }
+
+// Test Tx Level
+
+#[test]
+fn test_tx_level_high_pwr_min() {
+    // high power min is -2
+    let mut rfm = setup_rfm(Vec::new(), vec![]);
+    assert!(rfm.tx_level_high_pwr(-3).is_ok());
+    assert_eq!(rfm.spi.rx_buffer[0..=1], [Registers::PaLevel.write(), 0x50]);
+}
+
+#[test]
+fn test_tx_level_hp_max() {
+    // high power max is 20
+    let mut rfm = setup_rfm(Vec::new(), vec![]);
+    assert!(rfm.tx_level_high_pwr(21).is_ok());
+    assert_eq!(rfm.spi.rx_buffer[0..=1], [Registers::PaLevel.write(), 0x7f]);
+}
+
+#[test]
+fn test_tx_level_hp_mid() {
+    let mut rfm = setup_rfm(Vec::new(), vec![]);
+    assert!(rfm.tx_level_high_pwr(15).is_ok());
+    assert_eq!(rfm.spi.rx_buffer[0..=1], [Registers::PaLevel.write(), 0x7d]);
+}
+
+#[test]
+fn test_tx_level_lp_min() {
+    // Low Power min is -18
+    let mut rfm = setup_rfm(Vec::new(), vec![]);
+    assert!(rfm.tx_level(-19).is_ok());
+    assert_eq!(rfm.spi.rx_buffer[0..=1], [Registers::PaLevel.write(), 0x80]);
+}
+
+#[test]
+fn test_tx_level_lp_max() {
+    // Low power max is 13
+    let mut rfm = setup_rfm(Vec::new(), vec![]);
+    assert!(rfm.tx_level(14).is_ok());
+    assert_eq!(rfm.spi.rx_buffer[0..=1], [Registers::PaLevel.write(), 0x9f]);
+}
+
+#[test]
+fn test_tx_level_lp_mid() {
+    let mut rfm = setup_rfm(Vec::new(), vec![]);
+    assert!(rfm.tx_level(0).is_ok());
+    assert_eq!(rfm.spi.rx_buffer[0..=1], [Registers::PaLevel.write(), 0x92]);
+}
