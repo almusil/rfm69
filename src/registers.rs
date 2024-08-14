@@ -447,3 +447,9 @@ impl core::ops::BitAnd<IrqFlags2> for u8 {
         self & rhs as Self
     }
 }
+
+pub enum PaOptions {
+    Pa0On = 0x80,
+    Pa1On = 0x40,
+    Pa2On = 0x20,
+}
